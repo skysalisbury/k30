@@ -1,75 +1,306 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { KindnessAct, User, UserProfile, UserStreak } from '@/src/utils/dataModels';
+import {
+  getTodaysKindnessActs,
+  getUser,
+  getUserProfile,
+  getUserStreak,
+  saveKindnessAct,
+  saveUser,
+  saveUserProfile,
+  saveUserStreak
+} from '@/src/utils/storage';
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 export default function HomeScreen() {
+  // State variables - data that can change
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [streak, setStreak] = useState<UserStreak | null>(null);
+  const [todaysActs, setTodaysActs] = useState<KindnessAct[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Load data when screen loads
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+
+      // Try to load existing data
+      const userData = await getUser();
+      const profileData = await getUserProfile();
+      const streakData = await getUserStreak();
+      const actsData = await getTodaysKindnessActs();
+
+      // If no user exists, create demo data
+      if (!userData) {
+        await createDemoUser();
+        return;
+      }
+
+      setUser(userData);
+      setProfile(profileData);
+      setStreak(streakData);
+      setTodaysActs(actsData);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create demo user for testing
+  const createDemoUser = async () => {
+    try {
+      const demoUser: User = {
+        id: '1',
+        name: 'Kindness Warrior',
+        email: 'demo@kindness.app',
+        created_at: new Date().toISOString(),
+      };
+
+      const demoProfile: UserProfile = {
+        user_id: '1',
+        first_name: 'Kindness',
+        last_name: 'Warrior',
+        location_city: 'Atlanta',
+        emotional_state: 'happy',
+        mental_wellbeing: 'good',
+        updated_at: new Date().toISOString(),
+      };
+
+      const demoStreak: UserStreak = {
+        user_id: '1',
+        current_streak_days: 3,
+        longest_streak_days: 12,
+        last_activity_date: new Date().toISOString().split('T')[0],
+        total_days_active: 45,
+      };
+
+      await saveUser(demoUser);
+      await saveUserProfile(demoProfile);
+      await saveUserStreak(demoStreak);
+
+      setUser(demoUser);
+      setProfile(demoProfile);
+      setStreak(demoStreak);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error creating demo user:', error);
+      setLoading(false);
+    }
+  };
+
+  // Add a kindness act
+  const addKindnessAct = async () => {
+    if (!user) return;
+
+    try {
+      const newAct: KindnessAct = {
+        id: Date.now().toString(),
+        user_id: user.id,
+        date: new Date().toISOString().split('T')[0],
+        title: 'Helped someone today',
+        description: 'Made someone smile with a kind gesture',
+        category: 'random',
+        impact_level: 'medium',
+        mood_after: 'happy',
+        created_at: new Date().toISOString(),
+      };
+
+      await saveKindnessAct(newAct);
+
+      // Update streak
+      if (streak) {
+        const updatedStreak: UserStreak = {
+          ...streak,
+          current_streak_days: streak.current_streak_days + 1,
+          longest_streak_days: Math.max(streak.longest_streak_days, streak.current_streak_days + 1),
+          last_activity_date: new Date().toISOString().split('T')[0],
+          total_days_active: streak.total_days_active + 1,
+        };
+        await saveUserStreak(updatedStreak);
+        setStreak(updatedStreak);
+      }
+
+      // Refresh today's acts
+      const updatedActs = await getTodaysKindnessActs();
+      setTodaysActs(updatedActs);
+
+      Alert.alert('Success!', 'Your kindness act has been recorded! 🎉');
+    } catch (error) {
+      console.error('Error adding kindness act:', error);
+      Alert.alert('Error', 'Could not save your kindness act');
+    }
+  };
+
+  if (loading) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText>Loading your kindness data...</ThemedText>
+      </ThemedView>
+    );
+  }
+
+  const dailyGoal = 3;
+  const completedToday = todaysActs.length;
+  const progressPercentage = Math.min((completedToday / dailyGoal) * 100, 100);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
+    <ScrollView style={styles.container}>
+      <ThemedView style={styles.content}>
+
+        {/* Welcome Section */}
+        <ThemedView style={styles.welcomeSection}>
+          <ThemedText type="title">Welcome back! 👋</ThemedText>
+          <ThemedText type="subtitle">
+            {profile?.first_name || user?.name || 'Kindness Warrior'}
+          </ThemedText>
+          <ThemedText>Spread kindness, one act at a time</ThemedText>
+        </ThemedView>
+
+        {/* Streak Counter */}
+        <ThemedView style={styles.streakCard}>
+          <ThemedText type="title" style={styles.streakNumber}>
+            {streak?.current_streak_days || 0}
+          </ThemedText>
+          <ThemedText type="subtitle">Day Streak! 🔥</ThemedText>
+          <ThemedText>
+            Best: {streak?.longest_streak_days || 0} days
+          </ThemedText>
+        </ThemedView>
+
+        {/* Daily Progress */}
+        <ThemedView style={styles.progressCard}>
+          <ThemedText type="subtitle" style={styles.darkText}>Today's Progress</ThemedText>
+          <ThemedText style={styles.darkText}>{completedToday} of {dailyGoal} acts completed</ThemedText>
+
+          <ThemedView style={styles.progressBar}>
+            <ThemedView
+              style={[styles.progressFill, { width: `${progressPercentage}%` }]}
+            />
+          </ThemedView>
+
+          <ThemedText style={styles.darkText}>
+            {completedToday >= dailyGoal ? '🎉 Goal achieved!' : `${dailyGoal - completedToday} more to go!`}
+          </ThemedText>
+        </ThemedView>
+
+        {/* Today's Acts */}
+        <ThemedView style={styles.actsSection}>
+          <ThemedText type="subtitle">Today's Kindness Acts</ThemedText>
+          {todaysActs.length > 0 ? (
+            todaysActs.map((act, index) => (
+              <ThemedView key={act.id} style={styles.actCard}>
+                <ThemedText type="defaultSemiBold" style={styles.darkText}>{act.title}</ThemedText>
+                <ThemedText style={styles.darkText}>{act.description}</ThemedText>
+                <ThemedText style={styles.actMeta}>
+                  {act.category} • {act.impact_level} impact • Feeling {act.mood_after}
+                </ThemedText>
+              </ThemedView>
+            ))
+          ) : (
+            <ThemedText>No acts of kindness recorded today. Start with one below! 💝</ThemedText>
+          )}
+        </ThemedView>
+
+        {/* Add Kindness Button */}
+        <TouchableOpacity style={styles.addButton} onPress={addKindnessAct}>
+          <ThemedText type="defaultSemiBold" style={styles.addButtonText}>
+            ✨ Add Kindness Act
+          </ThemedText>
+        </TouchableOpacity>
+
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+  },
+  content: {
+    padding: 20,
+  },
+  welcomeSection: {
+    marginBottom: 30,
     alignItems: 'center',
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  streakCard: {
+    backgroundColor: '#FF6B6B',
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  streakNumber: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  progressCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 15,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  darkText: {
+    color: '#000000',
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 10,
+    marginVertical: 10,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#58CC02',
+    borderRadius: 10,
+  },
+  actsSection: {
+    marginBottom: 20,
+  },
+  actCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 15,
+    borderRadius: 10,
+    marginTop: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#58CC02',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  actMeta: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 5,
+    color: '#000000',
+  },
+  addButton: {
+    backgroundColor: '#58CC02',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  addButtonText: {
+    color: 'white',
+    fontSize: 16,
   },
 });

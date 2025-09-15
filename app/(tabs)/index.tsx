@@ -1,14 +1,15 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import ProfileSetupScreen from '@/src/screens/ProfileSetupScreen';
+import WelcomeScreen from '@/src/screens/WelcomeScreen';
 import { KindnessAct, User, UserProfile, UserStreak } from '@/src/utils/dataModels';
 import {
   getTodaysKindnessActs,
   getUser,
   getUserProfile,
   getUserStreak,
+  isUserSetupComplete,
   saveKindnessAct,
-  saveUser,
-  saveUserProfile,
   saveUserStreak
 } from '@/src/utils/storage';
 import React, { useEffect, useState } from 'react';
@@ -21,6 +22,8 @@ export default function HomeScreen() {
   const [streak, setStreak] = useState<UserStreak | null>(null);
   const [todaysActs, setTodaysActs] = useState<KindnessAct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userSetupComplete, setUserSetupComplete] = useState(false);
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
 
   // Load data when screen loads
   useEffect(() => {
@@ -31,67 +34,29 @@ export default function HomeScreen() {
     try {
       setLoading(true);
 
-      // Try to load existing data
+      // Check if user setup is complete
+      const setupComplete = await isUserSetupComplete();
+
+      if (!setupComplete) {
+        setUserSetupComplete(false);
+        setLoading(false);
+        return;
+      }
+
+      // Load actual user data
       const userData = await getUser();
       const profileData = await getUserProfile();
       const streakData = await getUserStreak();
       const actsData = await getTodaysKindnessActs();
 
-      // If no user exists, create demo data
-      if (!userData) {
-        await createDemoUser();
-        return;
-      }
-
       setUser(userData);
       setProfile(profileData);
       setStreak(streakData);
       setTodaysActs(actsData);
+      setUserSetupComplete(true);
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
-      setLoading(false);
-    }
-  };
-
-  // Create demo user for testing
-  const createDemoUser = async () => {
-    try {
-      const demoUser: User = {
-        id: '1',
-        name: 'Kindness Warrior',
-        email: 'demo@kindness.app',
-        created_at: new Date().toISOString(),
-      };
-
-      const demoProfile: UserProfile = {
-        user_id: '1',
-        first_name: 'Kindness',
-        last_name: 'Warrior',
-        location_city: 'Atlanta',
-        emotional_state: 'happy',
-        mental_wellbeing: 'good',
-        updated_at: new Date().toISOString(),
-      };
-
-      const demoStreak: UserStreak = {
-        user_id: '1',
-        current_streak_days: 3,
-        longest_streak_days: 12,
-        last_activity_date: new Date().toISOString().split('T')[0],
-        total_days_active: 45,
-      };
-
-      await saveUser(demoUser);
-      await saveUserProfile(demoProfile);
-      await saveUserStreak(demoStreak);
-
-      setUser(demoUser);
-      setProfile(demoProfile);
-      setStreak(demoStreak);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error creating demo user:', error);
       setLoading(false);
     }
   };
@@ -142,8 +107,33 @@ export default function HomeScreen() {
   if (loading) {
     return (
       <ThemedView style={styles.container}>
-        <ThemedText>Loading your kindness data...</ThemedText>
+        <ThemedView style={styles.centerContent}>
+          <ThemedText>Loading your kindness data...</ThemedText>
+        </ThemedView>
       </ThemedView>
+    );
+  }
+
+  // Show setup flow if user hasn't completed setup
+  if (!userSetupComplete) {
+    // Show profile setup if they've passed welcome
+    if (showProfileSetup) {
+      return (
+        <ProfileSetupScreen
+          onComplete={() => {
+            setShowProfileSetup(false);
+            setUserSetupComplete(true);
+            loadUserData(); // Reload data after setup
+          }}
+        />
+      );
+    }
+
+    // Show welcome screen first
+    return (
+      <WelcomeScreen
+        onGetStarted={() => setShowProfileSetup(true)}
+      />
     );
   }
 
@@ -226,6 +216,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    padding: 20,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
   welcomeSection: {

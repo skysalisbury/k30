@@ -36,6 +36,18 @@ export interface KindnessAct {
   created_at: string;
 }
 
+export interface JournalEntry {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  kindness_act_id?: string | null;
+  mood_before?: 'happy' | 'sad' | 'angry' | 'anxious' | 'calm' | 'excited' | 'grateful' | 'neutral';
+  mood_after?: 'happy' | 'sad' | 'angry' | 'anxious' | 'calm' | 'excited' | 'grateful' | 'neutral';
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface NotificationSettings {
   user_id: string;
   enabled: boolean;

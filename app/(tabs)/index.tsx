@@ -1,210 +1,305 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import ProfileSetupScreen from '@/src/screens/ProfileSetupScreen';
-import WelcomeScreen from '@/src/screens/WelcomeScreen';
-import { KindnessAct, User, UserProfile, UserStreak } from '@/src/utils/dataModels';
+import { getChallengeForDay } from '@/src/data/kind30Challenges';
+import { ChallengeProgress, User, UserStreak } from '@/src/utils/dataModels';
 import {
+  getChallengeProgress,
   getTodaysKindnessActs,
   getUser,
-  getUserProfile,
   getUserStreak,
-  isUserSetupComplete,
-  saveKindnessAct,
-  saveUserStreak
+  recalculateStreak,
+  startKIND30Challenge
 } from '@/src/utils/storage';
+import { useNavigation } from '@react-navigation/native';
+import moment from 'moment';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function HomeScreen() {
-  // State variables - data that can change
+  const navigation = useNavigation();
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [streak, setStreak] = useState<UserStreak | null>(null);
-  const [todaysActs, setTodaysActs] = useState<KindnessAct[]>([]);
+  const [challenge, setChallenge] = useState<ChallengeProgress | null>(null);
+  const [todaysActsCount, setTodaysActsCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [userSetupComplete, setUserSetupComplete] = useState(false);
-  const [showProfileSetup, setShowProfileSetup] = useState(false);
 
-  // Load data when screen loads
   useEffect(() => {
-    loadUserData();
+    loadData();
   }, []);
 
-  const loadUserData = async () => {
+  // Refresh data when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('Home screen focused - refreshing data');
+      loadData();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadData = async () => {
     try {
       setLoading(true);
 
-      // Check if user setup is complete
-      const setupComplete = await isUserSetupComplete();
-
-      if (!setupComplete) {
-        setUserSetupComplete(false);
-        setLoading(false);
-        return;
+      // First, recalculate streak to ensure it's accurate
+      // This runs every time the home screen loads
+      try {
+        await recalculateStreak();
+        console.log('Streak recalculated on home screen load');
+      } catch (error) {
+        console.log('Could not recalculate streak (this is OK if no user exists yet)');
       }
 
-      // Load actual user data
-      const userData = await getUser();
-      const profileData = await getUserProfile();
-      const streakData = await getUserStreak();
-      const actsData = await getTodaysKindnessActs();
+      const [userData, streakData, challengeData, todaysActs] = await Promise.all([
+        getUser(),
+        getUserStreak(),
+        getChallengeProgress(),
+        getTodaysKindnessActs()
+      ]);
+
+      console.log('Home screen loaded data:', {
+        user: userData,
+        streak: streakData,
+        challenge: challengeData,
+        todaysActs: todaysActs.length
+      });
 
       setUser(userData);
-      setProfile(profileData);
       setStreak(streakData);
-      setTodaysActs(actsData);
-      setUserSetupComplete(true);
+      setChallenge(challengeData);
+      setTodaysActsCount(todaysActs.length);
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('Error loading home data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Add a kindness act
-  const addKindnessAct = async () => {
-    if (!user) return;
+  const handleStartChallenge = async () => {
+    if (!user) {
+      Alert.alert('Error', 'Please complete your profile first');
+      return;
+    }
 
     try {
-      const newAct: KindnessAct = {
-        id: Date.now().toString(),
-        user_id: user.id,
-        date: new Date().toISOString().split('T')[0],
-        title: 'Helped someone today',
-        description: 'Made someone smile with a kind gesture',
-        category: 'random',
-        impact_level: 'medium',
-        mood_after: 'happy',
-        created_at: new Date().toISOString(),
-      };
-
-      await saveKindnessAct(newAct);
-
-      // Update streak
-      if (streak) {
-        const updatedStreak: UserStreak = {
-          ...streak,
-          current_streak_days: streak.current_streak_days + 1,
-          longest_streak_days: Math.max(streak.longest_streak_days, streak.current_streak_days + 1),
-          last_activity_date: new Date().toISOString().split('T')[0],
-          total_days_active: streak.total_days_active + 1,
-        };
-        await saveUserStreak(updatedStreak);
-        setStreak(updatedStreak);
-      }
-
-      // Refresh today's acts
-      const updatedActs = await getTodaysKindnessActs();
-      setTodaysActs(updatedActs);
-
-      Alert.alert('Success!', 'Your kindness act has been recorded! 🎉');
+      await startKIND30Challenge(user.id);
+      await loadData();
+      Alert.alert(
+        'Challenge Started!',
+        'Welcome to KIND30! Complete one act of kindness each day for 30 days.',
+        [{ text: 'Let\'s Go!' }]
+      );
     } catch (error) {
-      console.error('Error adding kindness act:', error);
-      Alert.alert('Error', 'Could not save your kindness act');
+      console.error('Error starting challenge:', error);
+      Alert.alert('Error', 'Failed to start challenge');
     }
+  };
+
+  const navigateToCalendar = () => {
+    // @ts-ignore - Navigation typing
+    navigation.navigate('calendar');
+  };
+
+  const navigateToJournal = () => {
+    // @ts-ignore - Navigation typing
+    navigation.navigate('journal');
   };
 
   if (loading) {
     return (
       <ThemedView style={styles.container}>
         <ThemedView style={styles.centerContent}>
-          <ThemedText>Loading your kindness data...</ThemedText>
+          <ThemedText>Loading...</ThemedText>
         </ThemedView>
       </ThemedView>
     );
   }
 
-  // Show setup flow if user hasn't completed setup
-  if (!userSetupComplete) {
-    // Show profile setup if they've passed welcome
-    if (showProfileSetup) {
-      return (
-        <ProfileSetupScreen
-          onComplete={() => {
-            setShowProfileSetup(false);
-            setUserSetupComplete(true);
-            loadUserData(); // Reload data after setup
-          }}
-        />
-      );
-    }
+  const currentDayChallenge = challenge ? getChallengeForDay(challenge.current_day) : null;
+  const progressPercentage = challenge ? (challenge.completed_days.length / 30) * 100 : 0;
 
-    // Show welcome screen first
-    return (
-      <WelcomeScreen
-        onGetStarted={() => setShowProfileSetup(true)}
-      />
-    );
-  }
-
-  const dailyGoal = 3;
-  const completedToday = todaysActs.length;
-  const progressPercentage = Math.min((completedToday / dailyGoal) * 100, 100);
+  console.log('Challenge display data:', {
+    completedDays: challenge?.completed_days,
+    completedCount: challenge?.completed_days.length,
+    currentDay: challenge?.current_day,
+    progressPercentage
+  });
 
   return (
     <ScrollView style={styles.container}>
       <ThemedView style={styles.content}>
 
-        {/* Welcome Section */}
-        <ThemedView style={styles.welcomeSection}>
-          <ThemedText type="title">Welcome back! 👋</ThemedText>
-          <ThemedText type="subtitle">
-            {profile?.first_name || user?.name || 'Kindness Warrior'}
+        {/* Welcome Header */}
+        <ThemedView style={styles.header}>
+          <ThemedText type="title">
+            Welcome back{user?.name ? `, ${user.name}` : ''}!
           </ThemedText>
-          <ThemedText>Spread kindness, one act at a time</ThemedText>
-        </ThemedView>
-
-        {/* Streak Counter */}
-        <ThemedView style={styles.streakCard}>
-          <ThemedText type="title" style={styles.streakNumber}>
-            {streak?.current_streak_days || 0}
-          </ThemedText>
-          <ThemedText type="subtitle">Day Streak! 🔥</ThemedText>
-          <ThemedText>
-            Best: {streak?.longest_streak_days || 0} days
+          <ThemedText style={styles.subtitle}>
+            {moment().format('dddd, MMMM Do')}
           </ThemedText>
         </ThemedView>
 
-        {/* Daily Progress */}
-        <ThemedView style={styles.progressCard}>
-          <ThemedText type="subtitle" style={styles.darkText}>Today's Progress</ThemedText>
-          <ThemedText style={styles.darkText}>{completedToday} of {dailyGoal} acts completed</ThemedText>
-
-          <ThemedView style={styles.progressBar}>
-            <ThemedView
-              style={[styles.progressFill, { width: `${progressPercentage}%` }]}
-            />
-          </ThemedView>
-
-          <ThemedText style={styles.darkText}>
-            {completedToday >= dailyGoal ? '🎉 Goal achieved!' : `${dailyGoal - completedToday} more to go!`}
-          </ThemedText>
-        </ThemedView>
-
-        {/* Today's Acts */}
-        <ThemedView style={styles.actsSection}>
-          <ThemedText type="subtitle">Today's Kindness Acts</ThemedText>
-          {todaysActs.length > 0 ? (
-            todaysActs.map((act, index) => (
-              <ThemedView key={act.id} style={styles.actCard}>
-                <ThemedText type="defaultSemiBold" style={styles.darkText}>{act.title}</ThemedText>
-                <ThemedText style={styles.darkText}>{act.description}</ThemedText>
-                <ThemedText style={styles.actMeta}>
-                  {act.category} • {act.impact_level} impact • Feeling {act.mood_after}
+        {/* Challenge Section */}
+        {challenge && challenge.is_active ? (
+          <ThemedView style={styles.challengeCard}>
+            <View style={styles.challengeHeader}>
+              <ThemedText type="subtitle" style={styles.challengeTitle}>
+                KIND30 Challenge
+              </ThemedText>
+              <ThemedView style={styles.dayBadge}>
+                <ThemedText style={styles.dayBadgeText}>
+                  Day {challenge.current_day}/30
                 </ThemedText>
               </ThemedView>
-            ))
-          ) : (
-            <ThemedText>No acts of kindness recorded today. Start with one below! 💝</ThemedText>
-          )}
-        </ThemedView>
+            </View>
 
-        {/* Add Kindness Button */}
-        <TouchableOpacity style={styles.addButton} onPress={addKindnessAct}>
-          <ThemedText type="defaultSemiBold" style={styles.addButtonText}>
-            ✨ Add Kindness Act
+            {/* Progress Bar */}
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+              </View>
+              <ThemedText style={styles.progressText}>
+                {challenge.completed_days.length} days completed
+              </ThemedText>
+            </View>
+
+            {/* Today's Challenge */}
+            {currentDayChallenge && challenge.current_day <= 30 && (
+              <ThemedView style={styles.todayChallenge}>
+                <View style={styles.challengeTypeRow}>
+                  <ThemedText style={styles.challengeType}>
+                    {currentDayChallenge.type === 'challenge' && '🎯 Challenge'}
+                    {currentDayChallenge.type === 'reflection' && '💭 Reflection'}
+                    {currentDayChallenge.type === 'inspiration' && '✨ Inspiration'}
+                    {currentDayChallenge.type === 'info' && '📚 Learn'}
+                    {currentDayChallenge.type === 'story' && '📖 Story'}
+                    {currentDayChallenge.type === 'launch' && '🚀 Launch'}
+                  </ThemedText>
+                </View>
+                <ThemedText type="defaultSemiBold" style={styles.challengeTodayTitle}>
+                  {currentDayChallenge.title}
+                </ThemedText>
+                <ThemedText style={styles.challengeDescription}>
+                  {currentDayChallenge.description}
+                </ThemedText>
+                <ThemedView style={styles.actionPromptBox}>
+                  <ThemedText style={styles.actionPromptLabel}>Today's Action:</ThemedText>
+                  <ThemedText style={styles.actionPrompt}>
+                    {currentDayChallenge.actionPrompt}
+                  </ThemedText>
+                </ThemedView>
+              </ThemedView>
+            )}
+
+            {/* Complete Challenge Message */}
+            {challenge.current_day > 30 && (
+              <ThemedView style={styles.completeMessage}>
+                <ThemedText style={styles.completeEmoji}>🎉</ThemedText>
+                <ThemedText type="subtitle" style={styles.completeTitle}>
+                  Challenge Complete!
+                </ThemedText>
+                <ThemedText style={styles.completeText}>
+                  You've completed all 30 days. Keep the kindness going!
+                </ThemedText>
+              </ThemedView>
+            )}
+
+            {/* Action Buttons */}
+            {challenge.current_day <= 30 && (
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={navigateToCalendar}
+                >
+                  <ThemedText style={styles.primaryButtonText}>
+                    Log Today's Act
+                  </ThemedText>
+                </TouchableOpacity>
+
+                {(currentDayChallenge?.type === 'reflection' || currentDayChallenge?.type === 'story') && (
+                  <TouchableOpacity
+                    style={styles.secondaryButton}
+                    onPress={navigateToJournal}
+                  >
+                    <ThemedText style={styles.secondaryButtonText}>
+                      Write Reflection
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </ThemedView>
+        ) : (
+          // No Active Challenge - Show CTA
+          <ThemedView style={styles.noChallengeCard}>
+            <ThemedText style={styles.noChallengeEmoji}>💚</ThemedText>
+            <ThemedText type="subtitle" style={styles.noChallengeTitle}>
+              Start Your Kindness Journey
+            </ThemedText>
+            <ThemedText style={styles.noChallengeText}>
+              Join the KIND30 challenge: 30 days of intentional kindness to build a lifelong habit.
+            </ThemedText>
+            <TouchableOpacity style={styles.startButton} onPress={handleStartChallenge}>
+              <ThemedText style={styles.startButtonText}>
+                Start KIND30 Challenge
+              </ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        )}
+
+        {/* Quick Stats */}
+        <View style={styles.statsRow}>
+          <ThemedView style={styles.statCard}>
+            <ThemedText style={styles.statNumber}>
+              {streak?.current_streak_days || 0}
+            </ThemedText>
+            <ThemedText style={styles.statLabel}>Day Streak</ThemedText>
+          </ThemedView>
+
+          <ThemedView style={styles.statCard}>
+            <ThemedText style={styles.statNumber}>
+              {todaysActsCount}
+            </ThemedText>
+            <ThemedText style={styles.statLabel}>Acts Today</ThemedText>
+          </ThemedView>
+
+          <ThemedView style={styles.statCard}>
+            <ThemedText style={styles.statNumber}>
+              {streak?.longest_streak_days || 0}
+            </ThemedText>
+            <ThemedText style={styles.statLabel}>Best Streak</ThemedText>
+          </ThemedView>
+        </View>
+
+        {/* Quick Actions */}
+        <ThemedView style={styles.quickActions}>
+          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+            Quick Actions
           </ThemedText>
-        </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickActionButton} onPress={navigateToCalendar}>
+            <View style={styles.quickActionContent}>
+              <ThemedText style={styles.quickActionIcon}>📅</ThemedText>
+              <View style={styles.quickActionText}>
+                <ThemedText type="defaultSemiBold" style={styles.quickActionTitle}>View Calendar</ThemedText>
+                <ThemedText style={styles.quickActionSubtext}>
+                  See your kindness history
+                </ThemedText>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickActionButton} onPress={navigateToJournal}>
+            <View style={styles.quickActionContent}>
+              <ThemedText style={styles.quickActionIcon}>📝</ThemedText>
+              <View style={styles.quickActionText}>
+                <ThemedText type="defaultSemiBold" style={styles.quickActionTitle}>Journal</ThemedText>
+                <ThemedText style={styles.quickActionSubtext}>
+                  Reflect on your journey
+                </ThemedText>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </ThemedView>
 
       </ThemedView>
     </ScrollView>
@@ -222,28 +317,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  welcomeSection: {
-    marginBottom: 30,
-    alignItems: 'center',
-  },
-  streakCard: {
-    backgroundColor: '#FF6B6B',
-    padding: 20,
-    borderRadius: 15,
-    alignItems: 'center',
+  header: {
     marginBottom: 20,
+    alignItems: 'center',
   },
-  streakNumber: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: 'white',
+  subtitle: {
+    opacity: 0.7,
+    marginTop: 5,
   },
-  progressCard: {
+  challengeCard: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
     borderRadius: 15,
+    padding: 20,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -251,52 +337,235 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  darkText: {
+  challengeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  challengeTitle: {
     color: '#000000',
   },
+  dayBadge: {
+    backgroundColor: '#58CC02',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  dayBadgeText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  progressContainer: {
+    marginBottom: 20,
+  },
   progressBar: {
-    height: 10,
+    height: 8,
     backgroundColor: '#E0E0E0',
-    borderRadius: 10,
-    marginVertical: 10,
+    borderRadius: 4,
     overflow: 'hidden',
+    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#58CC02',
-    borderRadius: 10,
+    borderRadius: 4,
   },
-  actsSection: {
-    marginBottom: 20,
+  progressText: {
+    fontSize: 12,
+    opacity: 0.7,
+    color: '#000000',
   },
-  actCard: {
-    backgroundColor: '#FFFFFF',
+  todayChallenge: {
+    backgroundColor: '#F8F9FA',
     padding: 15,
     borderRadius: 10,
-    marginTop: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#58CC02',
+    marginBottom: 15,
+  },
+  challengeTypeRow: {
+    marginBottom: 8,
+  },
+  challengeType: {
+    fontSize: 12,
+    color: '#58CC02',
+    fontWeight: '600',
+  },
+  challengeTodayTitle: {
+    fontSize: 18,
+    marginBottom: 8,
+    color: '#000000',
+  },
+  challengeDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+    color: '#000000',
+  },
+  actionPromptBox: {
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF6B6B',
+  },
+  actionPromptLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF6B6B',
+    marginBottom: 4,
+  },
+  actionPrompt: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#000000',
+  },
+  completeMessage: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  completeEmoji: {
+    fontSize: 48,
+    marginBottom: 10,
+  },
+  completeTitle: {
+    marginBottom: 8,
+    color: '#000000',
+  },
+  completeText: {
+    textAlign: 'center',
+    opacity: 0.7,
+    color: '#000000',
+  },
+  actionButtons: {
+    gap: 10,
+  },
+  primaryButton: {
+    backgroundColor: '#58CC02',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  secondaryButton: {
+    backgroundColor: '#FF6B6B',
+    padding: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  noChallengeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 15,
+    padding: 30,
+    marginBottom: 20,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  actMeta: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 5,
+  noChallengeEmoji: {
+    fontSize: 64,
+    marginBottom: 15,
+  },
+  noChallengeTitle: {
+    marginBottom: 10,
+    textAlign: 'center',
     color: '#000000',
   },
-  addButton: {
-    backgroundColor: '#58CC02',
-    padding: 15,
-    borderRadius: 25,
-    alignItems: 'center',
-    marginTop: 10,
+  noChallengeText: {
+    textAlign: 'center',
+    opacity: 0.7,
+    marginBottom: 20,
+    lineHeight: 20,
+    color: '#000000',
   },
-  addButtonText: {
-    color: 'white',
+  startButton: {
+    backgroundColor: '#58CC02',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 25,
+  },
+  startButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
     fontSize: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#58CC02',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    opacity: 0.7,
+    color: '#000000',
+  },
+  quickActions: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    marginBottom: 15,
+    color: '#FFFFFF',
+  },
+  quickActionButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  quickActionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quickActionIcon: {
+    fontSize: 32,
+    marginRight: 15,
+  },
+  quickActionText: {
+    flex: 1,
+  },
+  quickActionTitle: {
+    color: '#000000',
+  },
+  quickActionSubtext: {
+    fontSize: 13,
+    marginTop: 3,
+    color: '#000000',
+    fontWeight: '500',
   },
 });

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { JournalEntry, KindnessAct, NotificationSettings, User, UserProfile, UserStreak } from './dataModels';
+import moment from 'moment';
+import { ChallengeProgress, JournalEntry, KindnessAct, NotificationSettings, User, UserProfile, UserStreak } from './dataModels';
 
 // Storage keys - constants to avoid typos
 const STORAGE_KEYS = {
@@ -9,6 +10,7 @@ const STORAGE_KEYS = {
   KINDNESS_ACTS: 'kindness_acts',
   JOURNAL_ENTRIES: 'journal_entries',
   NOTIFICATION_SETTINGS: 'notification_settings',
+  CHALLENGE_PROGRESS: 'challenge_progress',
 };
 
 // User functions
@@ -68,6 +70,98 @@ export const getUserStreak = async (): Promise<UserStreak | null> => {
   } catch (error) {
     console.error('Error getting user streak:', error);
     return null;
+  }
+};
+
+// Recalculate streak based on actual calendar data
+export const recalculateStreak = async (): Promise<void> => {
+  try {
+    const user = await getUser();
+    if (!user) {
+      console.log('No user found');
+      throw new Error('No user found');
+    }
+
+    // Get all kindness acts
+    const acts = await getKindnessActs();
+
+    // Get unique dates with acts (sorted)
+    const datesWithActs = [...new Set(acts.map(act => act.date))].sort();
+
+    if (datesWithActs.length === 0) {
+      console.log('No acts found');
+      throw new Error('No kindness acts found');
+    }
+
+    console.log('Dates with acts:', datesWithActs);
+
+    // Calculate current streak by working backwards from today
+    const today = moment().format('YYYY-MM-DD');
+    let currentStreak = 0;
+    let checkDate = moment();
+
+    // Check if there's an act today or yesterday to start the streak
+    const hasActToday = datesWithActs.includes(today);
+    const hasActYesterday = datesWithActs.includes(moment().subtract(1, 'days').format('YYYY-MM-DD'));
+
+    if (!hasActToday && !hasActYesterday) {
+      // No recent activity, streak is 0
+      currentStreak = 0;
+    } else {
+      // Start from today if there's an act, otherwise yesterday
+      if (hasActToday) {
+        currentStreak = 1;
+        checkDate = moment().subtract(1, 'days');
+      } else {
+        currentStreak = 1;
+        checkDate = moment().subtract(2, 'days');
+      }
+
+      // Keep checking backwards for consecutive days
+      while (datesWithActs.includes(checkDate.format('YYYY-MM-DD'))) {
+        currentStreak++;
+        checkDate = checkDate.subtract(1, 'days');
+      }
+    }
+
+    // Calculate longest streak
+    let longestStreak = 0;
+    let tempStreak = 1;
+
+    for (let i = 1; i < datesWithActs.length; i++) {
+      const prevDate = moment(datesWithActs[i - 1]);
+      const currDate = moment(datesWithActs[i]);
+      const daysDiff = currDate.diff(prevDate, 'days');
+
+      if (daysDiff === 1) {
+        // Consecutive days
+        tempStreak++;
+      } else {
+        // Gap found, check if tempStreak is the longest
+        longestStreak = Math.max(longestStreak, tempStreak);
+        tempStreak = 1;
+      }
+    }
+    longestStreak = Math.max(longestStreak, tempStreak);
+
+    // Get the last activity date
+    const lastActivityDate = datesWithActs[datesWithActs.length - 1];
+
+    // Update the streak
+    const updatedStreak: UserStreak = {
+      user_id: user.id,
+      current_streak_days: currentStreak,
+      longest_streak_days: Math.max(longestStreak, currentStreak),
+      last_activity_date: lastActivityDate,
+      total_days_active: datesWithActs.length,
+    };
+
+    await saveUserStreak(updatedStreak);
+
+    console.log('Streak recalculated successfully:', updatedStreak);
+  } catch (error) {
+    console.error('Error recalculating streak:', error);
+    throw error;
   }
 };
 
@@ -202,6 +296,122 @@ export const getNotificationSettings = async (): Promise<NotificationSettings | 
   } catch (error) {
     console.error('Error getting notification settings:', error);
     return null;
+  }
+};
+
+// Challenge Progress functions
+export const saveChallengeProgress = async (progress: ChallengeProgress): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.CHALLENGE_PROGRESS, JSON.stringify(progress));
+  } catch (error) {
+    console.error('Error saving challenge progress:', error);
+    throw error;
+  }
+};
+
+export const getChallengeProgress = async (): Promise<ChallengeProgress | null> => {
+  try {
+    const progressData = await AsyncStorage.getItem(STORAGE_KEYS.CHALLENGE_PROGRESS);
+    return progressData ? JSON.parse(progressData) : null;
+  } catch (error) {
+    console.error('Error getting challenge progress:', error);
+    return null;
+  }
+};
+
+// Start a new KIND30 challenge
+export const startKIND30Challenge = async (userId: string): Promise<ChallengeProgress> => {
+  try {
+    const newChallenge: ChallengeProgress = {
+      user_id: userId,
+      challenge_name: 'KIND30',
+      start_date: new Date().toISOString(),
+      current_day: 1,
+      completed_days: [],
+      is_active: true,
+      last_updated: new Date().toISOString(),
+    };
+
+    await saveChallengeProgress(newChallenge);
+    return newChallenge;
+  } catch (error) {
+    console.error('Error starting KIND30 challenge:', error);
+    throw error;
+  }
+};
+
+// Mark a day as completed
+export const markChallengeDay = async (day: number): Promise<void> => {
+  try {
+    const progress = await getChallengeProgress();
+    if (!progress) {
+      console.error('No active challenge found');
+      return;
+    }
+
+    // Check if day is already completed
+    if (!progress.completed_days.includes(day)) {
+      progress.completed_days.push(day);
+      progress.completed_days.sort((a, b) => a - b); // Keep array sorted
+    }
+
+    // Update current day to next incomplete day
+    let nextDay = progress.current_day;
+    while (nextDay <= 30 && progress.completed_days.includes(nextDay)) {
+      nextDay++;
+    }
+    progress.current_day = nextDay;
+
+    // Check if challenge is complete
+    if (progress.completed_days.length === 30) {
+      progress.is_active = false;
+      progress.completed_at = new Date().toISOString();
+    }
+
+    progress.last_updated = new Date().toISOString();
+    await saveChallengeProgress(progress);
+  } catch (error) {
+    console.error('Error marking challenge day:', error);
+    throw error;
+  }
+};
+
+// Get days since challenge started
+export const getDaysSinceStart = async (): Promise<number> => {
+  try {
+    const progress = await getChallengeProgress();
+    if (!progress) return 0;
+
+    const startDate = new Date(progress.start_date);
+    const today = new Date();
+    const diffTime = Math.abs(today.getTime() - startDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return diffDays;
+  } catch (error) {
+    console.error('Error calculating days since start:', error);
+    return 0;
+  }
+};
+
+// Check if user has an active challenge
+export const hasActiveChallenge = async (): Promise<boolean> => {
+  try {
+    const progress = await getChallengeProgress();
+    return progress?.is_active || false;
+  } catch (error) {
+    console.error('Error checking active challenge:', error);
+    return false;
+  }
+};
+
+// Reset/restart challenge
+export const resetChallenge = async (userId: string): Promise<ChallengeProgress> => {
+  try {
+    return await startKIND30Challenge(userId);
+  } catch (error) {
+    console.error('Error resetting challenge:', error);
+    throw error;
   }
 };
 

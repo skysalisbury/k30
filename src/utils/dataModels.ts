@@ -58,3 +58,25 @@ export interface NotificationSettings {
   quiet_start: string;
   quiet_end: string;
 }
+
+export interface ChallengeProgress {
+  user_id: string;
+  challenge_name: 'KIND30';
+  start_date: string; // ISO date when user started the challenge
+  current_day: number; // 1-30
+  completed_days: number[]; // array of completed day numbers
+  is_active: boolean;
+  completed_at?: string; // ISO date when they finished all 30 days
+  last_updated: string;
+}
+
+export interface ChallengeProgress {
+  user_id: string;
+  challenge_name: 'KIND30';
+  start_date: string; // ISO date when user started the challenge
+  current_day: number; // 1-30
+  completed_days: number[]; // array of completed day numbers
+  is_active: boolean;
+  completed_at?: string; // ISO date when they finished all 30 days
+  last_updated: string;
+}

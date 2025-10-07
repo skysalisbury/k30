@@ -2,15 +2,18 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { KindnessAct, User } from '@/src/utils/dataModels';
 import {
+  getChallengeProgress,
   getKindnessActs,
+  getTodaysKindnessActs,
   getUser,
   getUserStreak,
+  markChallengeDay,
   saveKindnessAct,
   saveUserStreak
 } from '@/src/utils/storage';
 import moment from 'moment';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 
 export default function CalendarScreen() {
@@ -50,6 +53,8 @@ export default function CalendarScreen() {
       setLoading(true);
       const acts = await getKindnessActs();
       const userData = await getUser();
+      console.log('Loaded user:', userData);
+      console.log('Loaded acts:', acts);
       setKindnessActs(acts);
       setUser(userData);
     } catch (error) {
@@ -83,8 +88,17 @@ export default function CalendarScreen() {
   };
 
   const addKindnessAct = async () => {
-    if (!newActTitle.trim() || !user) {
-      console.log('Validation failed: Title required');
+    console.log('Save button clicked');
+    console.log('Title:', newActTitle);
+    console.log('User:', user);
+
+    if (!newActTitle.trim()) {
+      Alert.alert('Missing Information', 'Please enter a title for your kindness act');
+      return;
+    }
+
+    if (!user) {
+      Alert.alert('Error', 'User not found. Please complete your profile first.');
       return;
     }
 
@@ -101,20 +115,48 @@ export default function CalendarScreen() {
         created_at: new Date().toISOString(),
       };
 
+      console.log('Saving act:', newAct);
       await saveKindnessAct(newAct);
 
-      // Update streak if this is today
-      if (selectedDate === moment().format('YYYY-MM-DD')) {
+      // Only update streak and challenge on the FIRST act of the day
+      const todayActs = await getTodaysKindnessActs();
+      const isFirstActToday = todayActs.length === 1; // Will be 1 because we just saved one
+
+      if (selectedDate === moment().format('YYYY-MM-DD') && isFirstActToday) {
+        // Update streak
         const streak = await getUserStreak();
         if (streak) {
+          const yesterday = moment().subtract(1, 'days').format('YYYY-MM-DD');
+          const wasActiveYesterday = streak.last_activity_date === yesterday;
+          const isFirstEver = !streak.last_activity_date;
+
+          // Calculate new streak: reset to 1 if there was a gap, otherwise increment
+          const newStreakDays = (wasActiveYesterday || isFirstEver)
+            ? streak.current_streak_days + 1
+            : 1;
+
           const updatedStreak = {
             ...streak,
-            current_streak_days: streak.current_streak_days + 1,
-            longest_streak_days: Math.max(streak.longest_streak_days, streak.current_streak_days + 1),
+            current_streak_days: newStreakDays,
+            longest_streak_days: Math.max(streak.longest_streak_days, newStreakDays),
             last_activity_date: selectedDate,
             total_days_active: streak.total_days_active + 1,
           };
           await saveUserStreak(updatedStreak);
+          console.log('Streak updated:', updatedStreak);
+        }
+
+        // Update challenge progress - only once per day
+        const challenge = await getChallengeProgress();
+        if (challenge && challenge.is_active) {
+          const startDate = moment(challenge.start_date);
+          const today = moment();
+          const daysSinceStart = today.diff(startDate, 'days') + 1;
+
+          if (daysSinceStart <= 30 && !challenge.completed_days.includes(daysSinceStart)) {
+            await markChallengeDay(daysSinceStart);
+            console.log(`Challenge day ${daysSinceStart} marked complete`);
+          }
         }
       }
 
@@ -127,9 +169,11 @@ export default function CalendarScreen() {
       setNewActCategory('random');
       setShowAddModal(false);
 
+      Alert.alert('Success!', 'Your kindness act has been saved.');
       console.log('Kindness act added successfully');
     } catch (error) {
       console.error('Error adding kindness act:', error);
+      Alert.alert('Error', 'Failed to save kindness act. Please try again.');
     }
   };
 
@@ -239,6 +283,7 @@ export default function CalendarScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g., Helped elderly neighbor with groceries"
+                placeholderTextColor="#999"
                 value={newActTitle}
                 onChangeText={setNewActTitle}
                 multiline
@@ -250,6 +295,7 @@ export default function CalendarScreen() {
               <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder="Tell us more about what happened..."
+                placeholderTextColor="#999"
                 value={newActDescription}
                 onChangeText={setNewActDescription}
                 multiline

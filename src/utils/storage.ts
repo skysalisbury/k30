@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment';
 import { ChallengeProgress, JournalEntry, KindnessAct, NotificationSettings, User, UserProfile, UserStreak } from './dataModels';
 
-// Storage keys - constants to avoid typos
 const STORAGE_KEYS = {
   USER: 'user',
   USER_PROFILE: 'user_profile',
@@ -13,7 +12,6 @@ const STORAGE_KEYS = {
   CHALLENGE_PROGRESS: 'challenge_progress',
 };
 
-// User functions
 export const saveUser = async (user: User): Promise<void> => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
@@ -33,7 +31,6 @@ export const getUser = async (): Promise<User | null> => {
   }
 };
 
-// User Profile functions
 export const saveUserProfile = async (profile: UserProfile): Promise<void> => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
@@ -53,7 +50,6 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
   }
 };
 
-// Streak functions
 export const saveUserStreak = async (streak: UserStreak): Promise<void> => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.USER_STREAK, JSON.stringify(streak));
@@ -73,7 +69,6 @@ export const getUserStreak = async (): Promise<UserStreak | null> => {
   }
 };
 
-// Recalculate streak based on actual calendar data
 export const recalculateStreak = async (): Promise<void> => {
   try {
     const user = await getUser();
@@ -82,10 +77,7 @@ export const recalculateStreak = async (): Promise<void> => {
       throw new Error('No user found');
     }
 
-    // Get all kindness acts
     const acts = await getKindnessActs();
-
-    // Get unique dates with acts (sorted)
     const datesWithActs = [...new Set(acts.map(act => act.date))].sort();
 
     if (datesWithActs.length === 0) {
@@ -95,20 +87,16 @@ export const recalculateStreak = async (): Promise<void> => {
 
     console.log('Dates with acts:', datesWithActs);
 
-    // Calculate current streak by working backwards from today
     const today = moment().format('YYYY-MM-DD');
     let currentStreak = 0;
     let checkDate = moment();
 
-    // Check if there's an act today or yesterday to start the streak
     const hasActToday = datesWithActs.includes(today);
     const hasActYesterday = datesWithActs.includes(moment().subtract(1, 'days').format('YYYY-MM-DD'));
 
     if (!hasActToday && !hasActYesterday) {
-      // No recent activity, streak is 0
       currentStreak = 0;
     } else {
-      // Start from today if there's an act, otherwise yesterday
       if (hasActToday) {
         currentStreak = 1;
         checkDate = moment().subtract(1, 'days');
@@ -117,14 +105,12 @@ export const recalculateStreak = async (): Promise<void> => {
         checkDate = moment().subtract(2, 'days');
       }
 
-      // Keep checking backwards for consecutive days
       while (datesWithActs.includes(checkDate.format('YYYY-MM-DD'))) {
         currentStreak++;
         checkDate = checkDate.subtract(1, 'days');
       }
     }
 
-    // Calculate longest streak
     let longestStreak = 0;
     let tempStreak = 1;
 
@@ -134,20 +120,16 @@ export const recalculateStreak = async (): Promise<void> => {
       const daysDiff = currDate.diff(prevDate, 'days');
 
       if (daysDiff === 1) {
-        // Consecutive days
         tempStreak++;
       } else {
-        // Gap found, check if tempStreak is the longest
         longestStreak = Math.max(longestStreak, tempStreak);
         tempStreak = 1;
       }
     }
     longestStreak = Math.max(longestStreak, tempStreak);
 
-    // Get the last activity date
     const lastActivityDate = datesWithActs[datesWithActs.length - 1];
 
-    // Update the streak
     const updatedStreak: UserStreak = {
       user_id: user.id,
       current_streak_days: currentStreak,
@@ -157,7 +139,6 @@ export const recalculateStreak = async (): Promise<void> => {
     };
 
     await saveUserStreak(updatedStreak);
-
     console.log('Streak recalculated successfully:', updatedStreak);
   } catch (error) {
     console.error('Error recalculating streak:', error);
@@ -165,20 +146,14 @@ export const recalculateStreak = async (): Promise<void> => {
   }
 };
 
-// Kindness Acts functions
 export const saveKindnessAct = async (act: KindnessAct): Promise<void> => {
   try {
-    // Get existing acts
     const existingActs = await getKindnessActs();
-
-    // Check if act already exists (for updates)
     const existingIndex = existingActs.findIndex(existingAct => existingAct.id === act.id);
 
     if (existingIndex >= 0) {
-      // Update existing act
       existingActs[existingIndex] = act;
     } else {
-      // Add new act
       existingActs.push(act);
     }
 
@@ -199,11 +174,10 @@ export const getKindnessActs = async (): Promise<KindnessAct[]> => {
   }
 };
 
-// Get today's kindness acts
 export const getTodaysKindnessActs = async (): Promise<KindnessAct[]> => {
   try {
     const allActs = await getKindnessActs();
-    const today = new Date().toISOString().split('T')[0]; // Get YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
     return allActs.filter(act => act.date === today);
   } catch (error) {
     console.error('Error getting today\'s acts:', error);
@@ -211,20 +185,14 @@ export const getTodaysKindnessActs = async (): Promise<KindnessAct[]> => {
   }
 };
 
-// Journal Entry functions
 export const saveJournalEntry = async (entry: JournalEntry): Promise<void> => {
   try {
-    // Get existing entries
     const existingEntries = await getJournalEntries();
-
-    // Check if entry already exists (for updates)
     const existingIndex = existingEntries.findIndex(existingEntry => existingEntry.id === entry.id);
 
     if (existingIndex >= 0) {
-      // Update existing entry
       existingEntries[existingIndex] = entry;
     } else {
-      // Add new entry
       existingEntries.push(entry);
     }
 
@@ -256,11 +224,9 @@ export const deleteJournalEntry = async (entryId: string): Promise<void> => {
   }
 };
 
-// Get journal entries for a specific date
 export const getJournalEntriesForDate = async (date: string): Promise<JournalEntry[]> => {
   try {
     const allEntries = await getJournalEntries();
-    // Filter entries by date (comparing the date portion of created_at)
     return allEntries.filter(entry => entry.created_at.split('T')[0] === date);
   } catch (error) {
     console.error('Error getting journal entries for date:', error);
@@ -268,7 +234,6 @@ export const getJournalEntriesForDate = async (date: string): Promise<JournalEnt
   }
 };
 
-// Get journal entries linked to a specific kindness act
 export const getJournalEntriesForKindnessAct = async (kindnessActId: string): Promise<JournalEntry[]> => {
   try {
     const allEntries = await getJournalEntries();
@@ -279,7 +244,6 @@ export const getJournalEntriesForKindnessAct = async (kindnessActId: string): Pr
   }
 };
 
-// Notification Settings functions
 export const saveNotificationSettings = async (settings: NotificationSettings): Promise<void> => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATION_SETTINGS, JSON.stringify(settings));
@@ -299,7 +263,6 @@ export const getNotificationSettings = async (): Promise<NotificationSettings | 
   }
 };
 
-// Challenge Progress functions
 export const saveChallengeProgress = async (progress: ChallengeProgress): Promise<void> => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.CHALLENGE_PROGRESS, JSON.stringify(progress));
@@ -319,14 +282,13 @@ export const getChallengeProgress = async (): Promise<ChallengeProgress | null> 
   }
 };
 
-// Start a new KIND30 challenge
 export const startKIND30Challenge = async (userId: string): Promise<ChallengeProgress> => {
   try {
     const newChallenge: ChallengeProgress = {
       user_id: userId,
       challenge_name: 'KIND30',
       start_date: new Date().toISOString(),
-      current_day: 1,
+      current_day: 0,
       completed_days: [],
       is_active: true,
       last_updated: new Date().toISOString(),
@@ -340,7 +302,6 @@ export const startKIND30Challenge = async (userId: string): Promise<ChallengePro
   }
 };
 
-// Mark a day as completed
 export const markChallengeDay = async (day: number): Promise<void> => {
   try {
     const progress = await getChallengeProgress();
@@ -349,20 +310,17 @@ export const markChallengeDay = async (day: number): Promise<void> => {
       return;
     }
 
-    // Check if day is already completed
     if (!progress.completed_days.includes(day)) {
       progress.completed_days.push(day);
-      progress.completed_days.sort((a, b) => a - b); // Keep array sorted
+      progress.completed_days.sort((a, b) => a - b);
     }
 
-    // Update current day to next incomplete day
     let nextDay = progress.current_day;
     while (nextDay <= 30 && progress.completed_days.includes(nextDay)) {
       nextDay++;
     }
     progress.current_day = nextDay;
 
-    // Check if challenge is complete
     if (progress.completed_days.length === 30) {
       progress.is_active = false;
       progress.completed_at = new Date().toISOString();
@@ -376,7 +334,6 @@ export const markChallengeDay = async (day: number): Promise<void> => {
   }
 };
 
-// Get days since challenge started
 export const getDaysSinceStart = async (): Promise<number> => {
   try {
     const progress = await getChallengeProgress();
@@ -394,7 +351,6 @@ export const getDaysSinceStart = async (): Promise<number> => {
   }
 };
 
-// Check if user has an active challenge
 export const hasActiveChallenge = async (): Promise<boolean> => {
   try {
     const progress = await getChallengeProgress();
@@ -405,7 +361,6 @@ export const hasActiveChallenge = async (): Promise<boolean> => {
   }
 };
 
-// Reset/restart challenge
 export const resetChallenge = async (userId: string): Promise<ChallengeProgress> => {
   try {
     return await startKIND30Challenge(userId);
@@ -415,7 +370,6 @@ export const resetChallenge = async (userId: string): Promise<ChallengeProgress>
   }
 };
 
-// Utility function to clear all data (useful for testing)
 export const clearAllData = async (): Promise<void> => {
   try {
     await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
@@ -426,7 +380,6 @@ export const clearAllData = async (): Promise<void> => {
   }
 };
 
-// Check if user has completed setup
 export const isUserSetupComplete = async (): Promise<boolean> => {
   try {
     const user = await getUser();

@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import moment from 'moment';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -27,7 +28,6 @@ export default function HomeScreen() {
     loadData();
   }, []);
 
-  // Refresh data when screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       console.log('Home screen focused - refreshing data');
@@ -40,8 +40,6 @@ export default function HomeScreen() {
     try {
       setLoading(true);
 
-      // First, recalculate streak to ensure it's accurate
-      // This runs every time the home screen loads
       try {
         await recalculateStreak();
         console.log('Streak recalculated on home screen load');
@@ -106,11 +104,13 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.centerContent}>
-          <ThemedText>Loading...</ThemedText>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <ThemedView style={styles.container}>
+          <ThemedView style={styles.centerContent}>
+            <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+          </ThemedView>
         </ThemedView>
-      </ThemedView>
+      </SafeAreaView>
     );
   }
 
@@ -125,251 +125,277 @@ export default function HomeScreen() {
   });
 
   return (
-    <ScrollView style={styles.container}>
-      <ThemedView style={styles.content}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <ThemedView style={styles.content}>
 
-        {/* Welcome Header */}
-        <ThemedView style={styles.header}>
-          <ThemedText type="title">
-            Welcome back{user?.name ? `, ${user.name}` : ''}!
-          </ThemedText>
-          <ThemedText style={styles.subtitle}>
-            {moment().format('dddd, MMMM Do')}
-          </ThemedText>
-        </ThemedView>
+          {/* Welcome Header */}
+          <ThemedView style={styles.header}>
+            <ThemedText type="title" style={styles.headerTitle}>
+              Welcome back{user?.name ? `, ${user.name}` : ''}!
+            </ThemedText>
+            <ThemedText style={styles.subtitle}>
+              {moment().format('dddd, MMMM Do')}
+            </ThemedText>
+          </ThemedView>
 
-        {/* Challenge Section */}
-        {challenge && challenge.is_active ? (
-          <ThemedView style={styles.challengeCard}>
-            <View style={styles.challengeHeader}>
-              <ThemedText type="subtitle" style={styles.challengeTitle}>
-                KIND30 Challenge
-              </ThemedText>
-              <ThemedView style={styles.dayBadge}>
-                <ThemedText style={styles.dayBadgeText}>
-                  Day {challenge.current_day}/30
+          {/* Challenge Section */}
+          {challenge && challenge.is_active ? (
+            <ThemedView style={styles.challengeCard}>
+              <View style={styles.challengeHeader}>
+                <ThemedText type="subtitle" style={styles.challengeTitle}>
+                  KIND30 Challenge
                 </ThemedText>
-              </ThemedView>
-            </View>
-
-            {/* Progress Bar */}
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
-              </View>
-              <ThemedText style={styles.progressText}>
-                {challenge.completed_days.length} days completed
-              </ThemedText>
-            </View>
-
-            {/* Today's Challenge */}
-            {currentDayChallenge && challenge.current_day <= 30 && (
-              <ThemedView style={styles.todayChallenge}>
-                <View style={styles.challengeTypeRow}>
-                  <ThemedText style={styles.challengeType}>
-                    {currentDayChallenge.type === 'challenge' && '🎯 Challenge'}
-                    {currentDayChallenge.type === 'reflection' && '💭 Reflection'}
-                    {currentDayChallenge.type === 'inspiration' && '✨ Inspiration'}
-                    {currentDayChallenge.type === 'info' && '📚 Learn'}
-                    {currentDayChallenge.type === 'story' && '📖 Story'}
-                    {currentDayChallenge.type === 'launch' && '🚀 Launch'}
-                  </ThemedText>
-                </View>
-                <ThemedText type="defaultSemiBold" style={styles.challengeTodayTitle}>
-                  {currentDayChallenge.title}
-                </ThemedText>
-                <ThemedText style={styles.challengeDescription}>
-                  {currentDayChallenge.description}
-                </ThemedText>
-                <ThemedView style={styles.actionPromptBox}>
-                  <ThemedText style={styles.actionPromptLabel}>Today's Action:</ThemedText>
-                  <ThemedText style={styles.actionPrompt}>
-                    {currentDayChallenge.actionPrompt}
+                <ThemedView style={styles.dayBadge}>
+                  <ThemedText style={styles.dayBadgeText}>
+                    Day {challenge.completed_days.length}/30
                   </ThemedText>
                 </ThemedView>
-              </ThemedView>
-            )}
+              </View>
 
-            {/* Complete Challenge Message */}
-            {challenge.current_day > 30 && (
-              <ThemedView style={styles.completeMessage}>
-                <ThemedText style={styles.completeEmoji}>🎉</ThemedText>
-                <ThemedText type="subtitle" style={styles.completeTitle}>
-                  Challenge Complete!
+              {/* Progress Bar */}
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+                </View>
+                <ThemedText style={styles.progressText}>
+                  {challenge.completed_days.length} days completed
                 </ThemedText>
-                <ThemedText style={styles.completeText}>
-                  You've completed all 30 days. Keep the kindness going!
-                </ThemedText>
-              </ThemedView>
-            )}
+              </View>
 
-            {/* Action Buttons */}
-            {challenge.current_day <= 30 && (
-              <View style={styles.actionButtons}>
-                <TouchableOpacity
-                  style={styles.primaryButton}
-                  onPress={navigateToCalendar}
-                >
-                  <ThemedText style={styles.primaryButtonText}>
-                    Log Today's Act
+              {/* Today's Challenge */}
+              {currentDayChallenge && challenge.current_day <= 30 && (
+                <ThemedView style={styles.todayChallenge}>
+                  <View style={styles.challengeTypeRow}>
+                    <ThemedText style={styles.challengeType}>
+                      {currentDayChallenge.type === 'challenge' && '🎯 Challenge'}
+                      {currentDayChallenge.type === 'reflection' && '💭 Reflection'}
+                      {currentDayChallenge.type === 'inspiration' && '✨ Inspiration'}
+                      {currentDayChallenge.type === 'info' && '📚 Learn'}
+                      {currentDayChallenge.type === 'story' && '📖 Story'}
+                      {currentDayChallenge.type === 'launch' && '🚀 Launch'}
+                    </ThemedText>
+                  </View>
+                  <ThemedText type="defaultSemiBold" style={styles.challengeTodayTitle}>
+                    {currentDayChallenge.title}
                   </ThemedText>
-                </TouchableOpacity>
+                  <ThemedText style={styles.challengeDescription}>
+                    {currentDayChallenge.description}
+                  </ThemedText>
+                  <ThemedView style={styles.actionPromptBox}>
+                    <ThemedText style={styles.actionPromptLabel}>Today's Action:</ThemedText>
+                    <ThemedText style={styles.actionPrompt}>
+                      {currentDayChallenge.actionPrompt}
+                    </ThemedText>
+                  </ThemedView>
+                </ThemedView>
+              )}
 
-                {(currentDayChallenge?.type === 'reflection' || currentDayChallenge?.type === 'story') && (
+              {/* Complete Challenge Message */}
+              {challenge.current_day > 30 && (
+                <ThemedView style={styles.completeMessage}>
+                  <ThemedText style={styles.completeEmoji}>🎉</ThemedText>
+                  <ThemedText type="subtitle" style={styles.completeTitle}>
+                    Challenge Complete!
+                  </ThemedText>
+                  <ThemedText style={styles.completeText}>
+                    You've completed all 30 days. Keep the kindness going!
+                  </ThemedText>
+                </ThemedView>
+              )}
+
+              {/* Action Buttons */}
+              {challenge.current_day <= 30 && (
+                <View style={styles.actionButtons}>
                   <TouchableOpacity
-                    style={styles.secondaryButton}
-                    onPress={navigateToJournal}
+                    style={styles.primaryButton}
+                    onPress={navigateToCalendar}
                   >
-                    <ThemedText style={styles.secondaryButtonText}>
-                      Write Reflection
+                    <ThemedText style={styles.primaryButtonText}>
+                      Log Today's Act
                     </ThemedText>
                   </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </ThemedView>
-        ) : (
-          // No Active Challenge - Show CTA
-          <ThemedView style={styles.noChallengeCard}>
-            <ThemedText style={styles.noChallengeEmoji}>💚</ThemedText>
-            <ThemedText type="subtitle" style={styles.noChallengeTitle}>
-              Start Your Kindness Journey
-            </ThemedText>
-            <ThemedText style={styles.noChallengeText}>
-              Join the KIND30 challenge: 30 days of intentional kindness to build a lifelong habit.
-            </ThemedText>
-            <TouchableOpacity style={styles.startButton} onPress={handleStartChallenge}>
-              <ThemedText style={styles.startButtonText}>
-                Start KIND30 Challenge
+
+                  {(currentDayChallenge?.type === 'reflection' || currentDayChallenge?.type === 'story') && (
+                    <TouchableOpacity
+                      style={styles.secondaryButton}
+                      onPress={navigateToJournal}
+                    >
+                      <ThemedText style={styles.secondaryButtonText}>
+                        Write Reflection
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </ThemedView>
+          ) : (
+            <ThemedView style={styles.noChallengeCard}>
+              <ThemedText style={styles.noChallengeEmoji}>💚</ThemedText>
+              <ThemedText type="subtitle" style={styles.noChallengeTitle}>
+                Start Your Kindness Journey
               </ThemedText>
+              <ThemedText style={styles.noChallengeText}>
+                Join the KIND30 challenge: 30 days of intentional kindness to build a lifelong habit.
+              </ThemedText>
+              <TouchableOpacity style={styles.startButton} onPress={handleStartChallenge}>
+                <ThemedText style={styles.startButtonText}>
+                  Start KIND30 Challenge
+                </ThemedText>
+              </TouchableOpacity>
+            </ThemedView>
+          )}
+
+          {/* Quick Stats */}
+          <View style={styles.statsRow}>
+            <ThemedView style={styles.statCard}>
+              <ThemedText style={styles.statNumber}>
+                {streak?.current_streak_days || 0}
+              </ThemedText>
+              <ThemedText style={styles.statLabel}>Day Streak</ThemedText>
+            </ThemedView>
+
+            <ThemedView style={styles.statCard}>
+              <ThemedText style={styles.statNumber}>
+                {todaysActsCount}
+              </ThemedText>
+              <ThemedText style={styles.statLabel}>Acts Today</ThemedText>
+            </ThemedView>
+
+            <ThemedView style={styles.statCard}>
+              <ThemedText style={styles.statNumber}>
+                {streak?.longest_streak_days || 0}
+              </ThemedText>
+              <ThemedText style={styles.statLabel}>Best Streak</ThemedText>
+            </ThemedView>
+          </View>
+
+          {/* Quick Actions */}
+          <ThemedView style={styles.quickActions}>
+            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+              Quick Actions
+            </ThemedText>
+
+            <TouchableOpacity style={styles.quickActionButton} onPress={navigateToCalendar}>
+              <View style={styles.quickActionContent}>
+                <ThemedText style={styles.quickActionIcon}>📅</ThemedText>
+                <View style={styles.quickActionText}>
+                  <ThemedText type="defaultSemiBold" style={styles.quickActionTitle}>Calendar</ThemedText>
+                  <ThemedText style={styles.quickActionSubtext}>
+                    Log your daily kindness
+                  </ThemedText>
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickActionButton} onPress={navigateToJournal}>
+              <View style={styles.quickActionContent}>
+                <ThemedText style={styles.quickActionIcon}>📝</ThemedText>
+                <View style={styles.quickActionText}>
+                  <ThemedText type="defaultSemiBold" style={styles.quickActionTitle}>Journal</ThemedText>
+                  <ThemedText style={styles.quickActionSubtext}>
+                    Reflect on your journey
+                  </ThemedText>
+                </View>
+              </View>
             </TouchableOpacity>
           </ThemedView>
-        )}
 
-        {/* Quick Stats */}
-        <View style={styles.statsRow}>
-          <ThemedView style={styles.statCard}>
-            <ThemedText style={styles.statNumber}>
-              {streak?.current_streak_days || 0}
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>Day Streak</ThemedText>
-          </ThemedView>
-
-          <ThemedView style={styles.statCard}>
-            <ThemedText style={styles.statNumber}>
-              {todaysActsCount}
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>Acts Today</ThemedText>
-          </ThemedView>
-
-          <ThemedView style={styles.statCard}>
-            <ThemedText style={styles.statNumber}>
-              {streak?.longest_streak_days || 0}
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>Best Streak</ThemedText>
-          </ThemedView>
-        </View>
-
-        {/* Quick Actions */}
-        <ThemedView style={styles.quickActions}>
-          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-            Quick Actions
-          </ThemedText>
-
-          <TouchableOpacity style={styles.quickActionButton} onPress={navigateToCalendar}>
-            <View style={styles.quickActionContent}>
-              <ThemedText style={styles.quickActionIcon}>📅</ThemedText>
-              <View style={styles.quickActionText}>
-                <ThemedText type="defaultSemiBold" style={styles.quickActionTitle}>View Calendar</ThemedText>
-                <ThemedText style={styles.quickActionSubtext}>
-                  See your kindness history
-                </ThemedText>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionButton} onPress={navigateToJournal}>
-            <View style={styles.quickActionContent}>
-              <ThemedText style={styles.quickActionIcon}>📝</ThemedText>
-              <View style={styles.quickActionText}>
-                <ThemedText type="defaultSemiBold" style={styles.quickActionTitle}>Journal</ThemedText>
-                <ThemedText style={styles.quickActionSubtext}>
-                  Reflect on your journey
-                </ThemedText>
-              </View>
-            </View>
-          </TouchableOpacity>
         </ThemedView>
-
-      </ThemedView>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#40ae49',
+  },
   container: {
     flex: 1,
+    backgroundColor: '#40ae49',
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   content: {
     padding: 20,
+    paddingBottom: 40,
+    backgroundColor: 'transparent',
   },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  loadingText: {
+    color: '#ffffff',
   },
   header: {
     marginBottom: 20,
     alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  headerTitle: {
+    color: '#ffffff',
   },
   subtitle: {
-    opacity: 0.7,
+    opacity: 0.9,
     marginTop: 5,
+    color: '#ffffff',
   },
   challengeCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     borderRadius: 15,
     padding: 20,
     marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   challengeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 15,
+    backgroundColor: 'transparent',
   },
   challengeTitle: {
-    color: '#000000',
+    color: '#40ae49',
   },
   dayBadge: {
-    backgroundColor: '#58CC02',
+    backgroundColor: '#febe10',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
   },
   dayBadgeText: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontWeight: '600',
     fontSize: 12,
   },
   progressContainer: {
     marginBottom: 20,
+    backgroundColor: 'transparent',
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#d4dcc4',
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 8,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#58CC02',
+    backgroundColor: '#40ae49',
     borderRadius: 4,
   },
   progressText: {
@@ -378,17 +404,18 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   todayChallenge: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#f2f2f2',
     padding: 15,
     borderRadius: 10,
     marginBottom: 15,
   },
   challengeTypeRow: {
     marginBottom: 8,
+    backgroundColor: 'transparent',
   },
   challengeType: {
     fontSize: 12,
-    color: '#58CC02',
+    color: '#40ae49',
     fontWeight: '600',
   },
   challengeTodayTitle: {
@@ -403,16 +430,16 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   actionPromptBox: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     padding: 12,
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#FF6B6B',
+    borderLeftColor: '#febe10',
   },
   actionPromptLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FF6B6B',
+    color: '#febe10',
     marginBottom: 4,
   },
   actionPrompt: {
@@ -423,6 +450,7 @@ const styles = StyleSheet.create({
   completeMessage: {
     alignItems: 'center',
     padding: 20,
+    backgroundColor: 'transparent',
   },
   completeEmoji: {
     fontSize: 48,
@@ -430,7 +458,7 @@ const styles = StyleSheet.create({
   },
   completeTitle: {
     marginBottom: 8,
-    color: '#000000',
+    color: '#40ae49',
   },
   completeText: {
     textAlign: 'center',
@@ -441,38 +469,38 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   primaryButton: {
-    backgroundColor: '#58CC02',
+    backgroundColor: '#40ae49',
     padding: 15,
     borderRadius: 25,
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#ffffff',
     fontWeight: '600',
     fontSize: 16,
   },
   secondaryButton: {
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#88c78d',
     padding: 15,
     borderRadius: 25,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: '#FFFFFF',
+    color: '#ffffff',
     fontWeight: '600',
     fontSize: 16,
   },
   noChallengeCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     borderRadius: 15,
     padding: 30,
     marginBottom: 20,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   noChallengeEmoji: {
     fontSize: 64,
@@ -481,7 +509,7 @@ const styles = StyleSheet.create({
   noChallengeTitle: {
     marginBottom: 10,
     textAlign: 'center',
-    color: '#000000',
+    color: '#40ae49',
   },
   noChallengeText: {
     textAlign: 'center',
@@ -491,13 +519,13 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   startButton: {
-    backgroundColor: '#58CC02',
+    backgroundColor: '#febe10',
     paddingHorizontal: 30,
     paddingVertical: 15,
     borderRadius: 25,
   },
   startButtonText: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontWeight: '600',
     fontSize: 16,
   },
@@ -509,7 +537,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
@@ -522,7 +550,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#58CC02',
+    color: '#febe10',
     marginBottom: 4,
   },
   statLabel: {
@@ -532,13 +560,14 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     marginBottom: 20,
+    backgroundColor: 'transparent',
   },
   sectionTitle: {
     marginBottom: 15,
-    color: '#FFFFFF',
+    color: '#ffffff',
   },
   quickActionButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     borderRadius: 10,
     padding: 15,
     marginBottom: 10,
@@ -551,6 +580,7 @@ const styles = StyleSheet.create({
   quickActionContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   quickActionIcon: {
     fontSize: 32,
@@ -560,12 +590,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   quickActionTitle: {
-    color: '#000000',
+    color: '#40ae49',
   },
   quickActionSubtext: {
     fontSize: 13,
     marginTop: 3,
     color: '#000000',
-    fontWeight: '500',
+    opacity: 0.7,
   },
 });

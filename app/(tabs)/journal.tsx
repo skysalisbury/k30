@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { borderRadius, colors, spacing, typography } from '@/src/styles/globalStyles';
 import { JournalEntry, KindnessAct, User } from '@/src/utils/dataModels';
 import {
   deleteJournalEntry,
@@ -12,12 +13,15 @@ import moment from 'moment';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function JournalScreen() {
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
@@ -81,7 +85,6 @@ export default function JournalScreen() {
     setEditingEntry(entry);
     setNewEntryTitle(entry.title);
     setNewEntryContent(entry.content);
-    // Handle the optional kindness_act_id properly
     setSelectedKindnessAct(entry.kindness_act_id ?? null);
     setMoodBefore(entry.mood_before ?? 'neutral');
     setMoodAfter(entry.mood_after ?? 'happy');
@@ -169,314 +172,362 @@ export default function JournalScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.centerContent}>
-          <ThemedText>Loading journal...</ThemedText>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <ThemedView style={styles.container}>
+          <ThemedView style={styles.centerContent}>
+            <ThemedText>Loading journal...</ThemedText>
+          </ThemedView>
         </ThemedView>
-      </ThemedView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <ThemedView style={styles.content}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <ThemedView style={styles.content}>
 
-        {/* Header */}
-        <ThemedView style={styles.header}>
-          <ThemedText type="title">My Journal</ThemedText>
-          <ThemedText style={styles.subtitle}>
-            Reflect on your kindness journey
-          </ThemedText>
-        </ThemedView>
-
-        {/* Add Entry Button */}
-        <TouchableOpacity style={styles.addButton} onPress={startNewEntry}>
-          <ThemedText type="defaultSemiBold" style={styles.addButtonText}>
-            ✏️ Write New Entry
-          </ThemedText>
-        </TouchableOpacity>
-
-        {/* Add/Edit Form */}
-        {showAddForm && (
-          <ThemedView style={styles.addForm}>
-            <ThemedText type="subtitle" style={styles.formTitle}>
-              {editingEntry ? 'Edit Entry' : 'New Journal Entry'}
-            </ThemedText>
-
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>Title *</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="What's on your mind today?"
-                value={newEntryTitle}
-                onChangeText={setNewEntryTitle}
-                maxLength={100}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>Content *</ThemedText>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Share your thoughts, reflections, or experiences..."
-                value={newEntryContent}
-                onChangeText={setNewEntryContent}
-                multiline
-                numberOfLines={6}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>Link to Kindness Act (optional)</ThemedText>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.kindnessActsScroll}>
-                <TouchableOpacity
-                  style={[
-                    styles.kindnessActOption,
-                    !selectedKindnessAct && styles.kindnessActSelected
-                  ]}
-                  onPress={() => setSelectedKindnessAct(null)}
-                >
-                  <ThemedText style={styles.kindnessActText}>None</ThemedText>
-                </TouchableOpacity>
-                {kindnessActs.slice(0, 10).map((act) => (
-                  <TouchableOpacity
-                    key={act.id}
-                    style={[
-                      styles.kindnessActOption,
-                      selectedKindnessAct === act.id && styles.kindnessActSelected
-                    ]}
-                    onPress={() => setSelectedKindnessAct(act.id)}
-                  >
-                    <ThemedText style={styles.kindnessActText} numberOfLines={2}>
-                      {act.title}
-                    </ThemedText>
-                    <ThemedText style={styles.kindnessActDate}>
-                      {moment(act.date).format('MMM D')}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            <View style={styles.moodsRow}>
-              <View style={styles.moodGroup}>
-                <ThemedText style={styles.label}>Mood Before</ThemedText>
-                <View style={styles.moodGrid}>
-                  {moods.map((mood) => (
-                    <TouchableOpacity
-                      key={`before-${mood.value}`}
-                      style={[
-                        styles.moodOption,
-                        moodBefore === mood.value && styles.moodSelected
-                      ]}
-                      onPress={() => setMoodBefore(mood.value)}
-                    >
-                      <ThemedText style={styles.moodIcon}>{mood.icon}</ThemedText>
-                      <ThemedText style={styles.moodLabel}>{mood.label}</ThemedText>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.moodGroup}>
-                <ThemedText style={styles.label}>Mood After</ThemedText>
-                <View style={styles.moodGrid}>
-                  {moods.map((mood) => (
-                    <TouchableOpacity
-                      key={`after-${mood.value}`}
-                      style={[
-                        styles.moodOption,
-                        moodAfter === mood.value && styles.moodSelected
-                      ]}
-                      onPress={() => setMoodAfter(mood.value)}
-                    >
-                      <ThemedText style={styles.moodIcon}>{mood.icon}</ThemedText>
-                      <ThemedText style={styles.moodLabel}>{mood.label}</ThemedText>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.formButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={cancelForm}>
-                <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={saveEntry}>
-                <ThemedText style={styles.saveButtonText}>
-                  {editingEntry ? 'Update Entry' : 'Save Entry'}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </ThemedView>
-        )}
-
-        {/* Journal Entries List */}
-        <ThemedView style={styles.entriesSection}>
-          {journalEntries.length > 0 ? (
-            journalEntries.map((entry) => {
-              const linkedAct = getLinkedKindnessAct(entry.kindness_act_id);
-              return (
-                <ThemedView key={entry.id} style={styles.entryCard}>
-                  <View style={styles.entryHeader}>
-                    <View style={styles.entryTitleRow}>
-                      <ThemedText type="defaultSemiBold" style={styles.entryTitle}>
-                        {entry.title}
-                      </ThemedText>
-                      <View style={styles.entryActions}>
-                        <TouchableOpacity
-                          style={styles.actionButton}
-                          onPress={() => startEditEntry(entry)}
-                        >
-                          <ThemedText style={styles.actionButtonText}>Edit</ThemedText>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.deleteButton]}
-                          onPress={() => confirmDeleteEntry(entry)}
-                        >
-                          <ThemedText style={styles.deleteButtonText}>Delete</ThemedText>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                    <ThemedText style={styles.entryDate}>
-                      {moment(entry.created_at).format('MMMM Do, YYYY • h:mm A')}
-                    </ThemedText>
-                  </View>
-
-                  <ThemedText style={styles.entryContent} numberOfLines={3}>
-                    {entry.content}
-                  </ThemedText>
-
-                  {linkedAct && (
-                    <ThemedView style={styles.linkedActCard}>
-                      <ThemedText style={styles.linkedActLabel}>💝 Linked to:</ThemedText>
-                      <ThemedText style={styles.linkedActTitle}>{linkedAct.title}</ThemedText>
-                    </ThemedView>
-                  )}
-
-                  <View style={styles.moodIndicators}>
-                    <View style={styles.moodIndicator}>
-                      <ThemedText style={styles.moodIndicatorIcon}>
-                        {getMoodIcon(entry.mood_before || 'neutral')}
-                      </ThemedText>
-                      <ThemedText style={styles.moodIndicatorLabel}>Before</ThemedText>
-                    </View>
-                    <ThemedText style={styles.moodArrow}>→</ThemedText>
-                    <View style={styles.moodIndicator}>
-                      <ThemedText style={styles.moodIndicatorIcon}>
-                        {getMoodIcon(entry.mood_after || 'happy')}
-                      </ThemedText>
-                      <ThemedText style={styles.moodIndicatorLabel}>After</ThemedText>
-                    </View>
-                  </View>
-                </ThemedView>
-              );
-            })
-          ) : (
-            <ThemedView style={styles.emptyState}>
-              <ThemedText style={styles.emptyIcon}>📔</ThemedText>
-              <ThemedText style={styles.emptyText}>No journal entries yet</ThemedText>
-              <ThemedText style={styles.emptySubtext}>
-                Start writing to track your kindness journey and reflect on your experiences
+            {/* Header */}
+            <ThemedView style={styles.header}>
+              <ThemedText type="title">My Journal</ThemedText>
+              <ThemedText style={styles.subtitle}>
+                Reflect on your kindness journey
               </ThemedText>
             </ThemedView>
-          )}
-        </ThemedView>
 
-      </ThemedView>
-    </ScrollView>
+            {/* Add Entry Button */}
+            <TouchableOpacity style={styles.addButton} onPress={startNewEntry}>
+              <ThemedText type="defaultSemiBold" style={styles.addButtonText}>
+                ✏️ Write New Entry
+              </ThemedText>
+            </TouchableOpacity>
+
+            {/* Add/Edit Form */}
+            {showAddForm && (
+              <ThemedView style={styles.addForm}>
+                <ThemedText type="subtitle" style={styles.formTitle}>
+                  {editingEntry ? 'Edit Entry' : 'New Journal Entry'}
+                </ThemedText>
+
+                <View style={styles.inputGroup}>
+                  <ThemedText style={styles.label}>Title *</ThemedText>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="What's on your mind today?"
+                    placeholderTextColor={colors.text.light}
+                    value={newEntryTitle}
+                    onChangeText={setNewEntryTitle}
+                    maxLength={100}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <ThemedText style={styles.label}>Content *</ThemedText>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    placeholder="Share your thoughts, reflections, or experiences..."
+                    placeholderTextColor={colors.text.light}
+                    value={newEntryContent}
+                    onChangeText={setNewEntryContent}
+                    multiline
+                    numberOfLines={6}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <ThemedText style={styles.label}>Link to Kindness Act (optional)</ThemedText>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.kindnessActsScroll}>
+                    <TouchableOpacity
+                      style={[
+                        styles.kindnessActOption,
+                        !selectedKindnessAct && styles.kindnessActSelected
+                      ]}
+                      onPress={() => setSelectedKindnessAct(null)}
+                    >
+                      <ThemedText style={styles.kindnessActText}>None</ThemedText>
+                    </TouchableOpacity>
+                    {kindnessActs.slice(0, 10).map((act) => (
+                      <TouchableOpacity
+                        key={act.id}
+                        style={[
+                          styles.kindnessActOption,
+                          selectedKindnessAct === act.id && styles.kindnessActSelected
+                        ]}
+                        onPress={() => setSelectedKindnessAct(act.id)}
+                      >
+                        <ThemedText style={styles.kindnessActText} numberOfLines={2}>
+                          {act.title}
+                        </ThemedText>
+                        <ThemedText style={styles.kindnessActDate}>
+                          {moment(act.date).format('MMM D')}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                <View style={styles.moodsRow}>
+                  <View style={styles.moodGroup}>
+                    <ThemedText style={styles.label}>Mood Before</ThemedText>
+                    <View style={styles.moodGrid}>
+                      {moods.map((mood) => (
+                        <TouchableOpacity
+                          key={`before-${mood.value}`}
+                          style={[
+                            styles.moodOption,
+                            moodBefore === mood.value && styles.moodSelected
+                          ]}
+                          onPress={() => setMoodBefore(mood.value)}
+                        >
+                          <ThemedText style={styles.moodIcon}>{mood.icon}</ThemedText>
+                          <ThemedText style={styles.moodLabel}>{mood.label}</ThemedText>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  <View style={styles.moodGroup}>
+                    <ThemedText style={styles.label}>Mood After</ThemedText>
+                    <View style={styles.moodGrid}>
+                      {moods.map((mood) => (
+                        <TouchableOpacity
+                          key={`after-${mood.value}`}
+                          style={[
+                            styles.moodOption,
+                            moodAfter === mood.value && styles.moodSelected
+                          ]}
+                          onPress={() => setMoodAfter(mood.value)}
+                        >
+                          <ThemedText style={styles.moodIcon}>{mood.icon}</ThemedText>
+                          <ThemedText style={styles.moodLabel}>{mood.label}</ThemedText>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.formButtons}>
+                  <TouchableOpacity style={styles.cancelButton} onPress={cancelForm}>
+                    <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.saveButton} onPress={saveEntry}>
+                    <ThemedText style={styles.saveButtonText}>
+                      {editingEntry ? 'Update' : 'Save'}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </ThemedView>
+            )}
+
+            {/* Journal Entries */}
+            <ThemedView style={styles.entriesSection}>
+              {journalEntries.length > 0 ? (
+                journalEntries.map((entry) => {
+                  const linkedAct = getLinkedKindnessAct(entry.kindness_act_id);
+                  return (
+                    <ThemedView key={entry.id} style={styles.entryCard}>
+                      <View style={styles.entryHeader}>
+                        <View style={styles.entryTitleRow}>
+                          <ThemedText type="defaultSemiBold" style={styles.entryTitle}>
+                            {entry.title}
+                          </ThemedText>
+                          <View style={styles.entryActions}>
+                            <TouchableOpacity
+                              style={styles.actionButton}
+                              onPress={() => startEditEntry(entry)}
+                            >
+                              <ThemedText style={styles.actionButtonText}>Edit</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.actionButton, styles.deleteButton]}
+                              onPress={() => confirmDeleteEntry(entry)}
+                            >
+                              <ThemedText style={styles.deleteButtonText}>Delete</ThemedText>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        <ThemedText style={styles.entryDate}>
+                          {moment(entry.created_at).format('MMMM Do, YYYY • h:mm A')}
+                        </ThemedText>
+                      </View>
+
+                      <ThemedText style={styles.entryContent}>{entry.content}</ThemedText>
+
+                      {linkedAct && (
+                        <ThemedView style={styles.linkedActCard}>
+                          <ThemedText style={styles.linkedActLabel}>
+                            🔗 Linked to Kindness Act
+                          </ThemedText>
+                          <ThemedText style={styles.linkedActTitle}>
+                            {linkedAct.title}
+                          </ThemedText>
+                        </ThemedView>
+                      )}
+
+                      <View style={styles.moodIndicators}>
+                        <View style={styles.moodIndicator}>
+                          <ThemedText style={styles.moodIndicatorIcon}>
+                            {getMoodIcon(entry.mood_before || 'neutral')}
+                          </ThemedText>
+                          <ThemedText style={styles.moodIndicatorLabel}>Before</ThemedText>
+                        </View>
+                        <ThemedText style={styles.moodArrow}>→</ThemedText>
+                        <View style={styles.moodIndicator}>
+                          <ThemedText style={styles.moodIndicatorIcon}>
+                            {getMoodIcon(entry.mood_after || 'happy')}
+                          </ThemedText>
+                          <ThemedText style={styles.moodIndicatorLabel}>After</ThemedText>
+                        </View>
+                      </View>
+                    </ThemedView>
+                  );
+                })
+              ) : (
+                <ThemedView style={styles.emptyState}>
+                  <ThemedText style={styles.emptyIcon}>📔</ThemedText>
+                  <ThemedText type="defaultSemiBold" style={styles.emptyText}>
+                    No journal entries yet
+                  </ThemedText>
+                  <ThemedText style={styles.emptySubtext}>
+                    Start writing to reflect on your kindness journey
+                  </ThemedText>
+                </ThemedView>
+              )}
+            </ThemedView>
+
+          </ThemedView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  // MAIN BACKGROUND - Primary Green
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#40ae49',
+  },
   container: {
     flex: 1,
+    backgroundColor: '#40ae49',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   content: {
-    padding: 20,
+    padding: spacing.md,
+    backgroundColor: 'transparent',
   },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
+
+  // HEADER - White text on green
   header: {
-    marginBottom: 20,
+    marginBottom: spacing.md,
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   subtitle: {
-    opacity: 0.7,
-    marginTop: 5,
+    opacity: 0.9,
+    marginTop: spacing.xs,
+    color: '#ffffff',
   },
+
+  // ADD BUTTON - Primary Yellow
   addButton: {
-    backgroundColor: '#FF6B6B',
-    padding: 15,
-    borderRadius: 25,
+    backgroundColor: '#febe10',
+    padding: spacing.md,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  addForm: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 15,
-    marginBottom: 20,
+    marginBottom: spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
   },
+  addButtonText: {
+    color: '#000000',
+    fontSize: typography.sizes.md,
+    fontWeight: '600',
+  },
+
+  // ADD FORM - White card
+  addForm: {
+    backgroundColor: '#ffffff',
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
   formTitle: {
     textAlign: 'center',
-    marginBottom: 20,
-    color: '#000000',
+    marginBottom: spacing.md,
+    color: '#40ae49',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: spacing.md,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    marginBottom: spacing.sm,
     color: '#000000',
   },
   input: {
-    backgroundColor: '#F8F9FA',
-    padding: 15,
-    borderRadius: 10,
-    fontSize: 16,
+    backgroundColor: '#f2f2f2',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    fontSize: typography.sizes.md,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#d4dcc4',
     color: '#000000',
   },
   textArea: {
     height: 120,
     textAlignVertical: 'top',
   },
+
+  // KINDNESS ACTS SCROLL
   kindnessActsScroll: {
-    marginTop: 5,
+    marginTop: spacing.xs,
   },
   kindnessActOption: {
-    backgroundColor: '#F8F9FA',
-    padding: 12,
-    borderRadius: 10,
-    marginRight: 10,
+    backgroundColor: '#f2f2f2',
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginRight: spacing.sm,
     minWidth: 100,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: '#d4dcc4',
   },
   kindnessActSelected: {
-    borderColor: '#FF6B6B',
-    backgroundColor: '#FFF0F0',
+    borderColor: '#40ae49',
+    backgroundColor: '#88c78d',
   },
   kindnessActText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
     color: '#000000',
   },
   kindnessActDate: {
@@ -485,14 +536,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: '#000000',
   },
+
+  // MOODS SECTION
   moodsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: spacing.md,
   },
   moodGroup: {
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: spacing.xs,
   },
   moodGrid: {
     flexDirection: 'row',
@@ -501,17 +554,17 @@ const styles = StyleSheet.create({
   },
   moodOption: {
     width: '23%',
-    backgroundColor: '#F8F9FA',
-    padding: 8,
-    borderRadius: 8,
+    backgroundColor: '#f2f2f2',
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: '#d4dcc4',
   },
   moodSelected: {
-    borderColor: '#FF6B6B',
-    backgroundColor: '#FFF0F0',
+    borderColor: '#40ae49',
+    backgroundColor: '#88c78d',
   },
   moodIcon: {
     fontSize: 16,
@@ -520,125 +573,138 @@ const styles = StyleSheet.create({
   moodLabel: {
     fontSize: 8,
     textAlign: 'center',
-    color: '#666',
+    color: '#000000',
   },
+
+  // FORM BUTTONS
   formButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-    padding: 15,
-    borderRadius: 25,
+    backgroundColor: '#f2f2f2',
+    padding: spacing.md,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: spacing.sm,
   },
   cancelButtonText: {
-    color: '#666',
-    fontWeight: '600',
+    color: '#000000',
+    fontWeight: typography.weights.semibold,
   },
   saveButton: {
     flex: 1,
-    backgroundColor: '#FF6B6B',
-    padding: 15,
-    borderRadius: 25,
+    backgroundColor: '#40ae49',
+    padding: spacing.md,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
-    marginLeft: 10,
+    marginLeft: spacing.sm,
   },
   saveButtonText: {
-    color: 'white',
-    fontWeight: '600',
+    color: '#ffffff',
+    fontWeight: typography.weights.semibold,
   },
+
+  // ENTRIES SECTION
   entriesSection: {
-    marginTop: 20,
+    marginTop: spacing.md,
+    backgroundColor: 'transparent',
   },
   entryCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 15,
-    marginBottom: 15,
+    backgroundColor: '#ffffff',
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   entryHeader: {
-    marginBottom: 15,
+    marginBottom: spacing.md,
+    backgroundColor: 'transparent',
   },
   entryTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 5,
+    marginBottom: spacing.xs,
+    backgroundColor: 'transparent',
   },
   entryTitle: {
     flex: 1,
     color: '#000000',
-    fontSize: 18,
+    fontSize: typography.sizes.lg,
   },
   entryActions: {
     flexDirection: 'row',
+    backgroundColor: 'transparent',
   },
   actionButton: {
-    backgroundColor: '#E8F4FD',
-    paddingHorizontal: 12,
+    backgroundColor: '#f2f2f2',
+    paddingHorizontal: spacing.sm,
     paddingVertical: 6,
-    borderRadius: 15,
-    marginLeft: 8,
+    borderRadius: borderRadius.full,
+    marginLeft: spacing.sm,
   },
   actionButtonText: {
-    color: '#2196F3',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#40ae49',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
   },
   deleteButton: {
     backgroundColor: '#FFEBEE',
   },
   deleteButtonText: {
-    color: '#F44336',
-    fontSize: 12,
-    fontWeight: '600',
+    color: colors.ui.error,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
   },
   entryDate: {
-    fontSize: 12,
+    fontSize: typography.sizes.xs,
     opacity: 0.7,
     color: '#000000',
   },
   entryContent: {
-    fontSize: 16,
+    fontSize: typography.sizes.md,
     lineHeight: 24,
     color: '#000000',
-    marginBottom: 15,
+    marginBottom: spacing.md,
   },
+
+  // LINKED ACT CARD
   linkedActCard: {
-    backgroundColor: '#F0F8E8',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 15,
+    backgroundColor: '#fcebb4',
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
   },
   linkedActLabel: {
-    fontSize: 12,
-    color: '#58CC02',
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: typography.sizes.xs,
+    color: '#40ae49',
+    fontWeight: typography.weights.semibold,
+    marginBottom: spacing.xs,
   },
   linkedActTitle: {
-    fontSize: 14,
+    fontSize: typography.sizes.sm,
     color: '#000000',
   },
+
+  // MOOD INDICATORS
   moodIndicators: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   moodIndicator: {
     alignItems: 'center',
   },
   moodIndicatorIcon: {
     fontSize: 20,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   moodIndicatorLabel: {
     fontSize: 10,
@@ -646,27 +712,32 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   moodArrow: {
-    marginHorizontal: 20,
+    marginHorizontal: spacing.md,
     fontSize: 16,
     opacity: 0.5,
     color: '#000000',
   },
+
+  // EMPTY STATE - White text on green
   emptyState: {
     alignItems: 'center',
-    padding: 40,
+    padding: spacing.xl,
+    backgroundColor: 'transparent',
   },
   emptyIcon: {
     fontSize: 48,
-    marginBottom: 15,
+    marginBottom: spacing.md,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    marginBottom: spacing.sm,
+    color: '#ffffff',
   },
   emptySubtext: {
     textAlign: 'center',
-    opacity: 0.7,
+    opacity: 0.9,
     lineHeight: 20,
+    color: '#ffffff',
   },
 });

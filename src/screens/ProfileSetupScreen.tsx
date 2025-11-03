@@ -3,7 +3,8 @@ import { ThemedView } from '@/components/ThemedView';
 import { NotificationSettings, User, UserProfile, UserStreak } from '@/src/utils/dataModels';
 import { saveNotificationSettings, saveUser, saveUserProfile, saveUserStreak } from '@/src/utils/storage';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface ProfileSetupScreenProps {
   onComplete: () => void;
@@ -18,39 +19,32 @@ export default function ProfileSetupScreen({ onComplete }: ProfileSetupScreenPro
   const [isCreating, setIsCreating] = useState(false);
 
   const emotionalStates = [
-    { value: 'happy', label: 'Happy 😊', icon: '😊' },
-    { value: 'excited', label: 'Excited 🎉', icon: '🎉' },
-    { value: 'peaceful', label: 'Peaceful 😌', icon: '😌' },
-    { value: 'neutral', label: 'Neutral 😐', icon: '😐' },
-    { value: 'anxious', label: 'Anxious 😰', icon: '😰' },
-    { value: 'stressed', label: 'Stressed 😤', icon: '😤' },
-    { value: 'sad', label: 'Sad 😢', icon: '😢' },
+    { value: 'happy', label: 'Happy', icon: '😊' },
+    { value: 'excited', label: 'Excited', icon: '🎉' },
+    { value: 'peaceful', label: 'Peaceful', icon: '😌' },
+    { value: 'neutral', label: 'Neutral', icon: '😐' },
+    { value: 'anxious', label: 'Anxious', icon: '😰' },
+    { value: 'stressed', label: 'Stressed', icon: '😤' },
+    { value: 'sad', label: 'Sad', icon: '😢' },
   ] as const;
 
   const completeSetup = async () => {
-    console.log('Create Profile button clicked!'); // Debug log
-    console.log('Form values:', { firstName, lastName, email, city, emotionalState }); // Debug log
-
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
       Alert.alert('Required Fields', 'Please fill in your name and email');
       return;
     }
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert('Invalid Email', 'Please enter a valid email address');
       return;
     }
 
-    console.log('Validation passed, creating profile...'); // Debug log
     setIsCreating(true);
 
     try {
       const userId = Date.now().toString();
-      console.log('Generated userId:', userId); // Debug log
 
-      // Create user
       const user: User = {
         id: userId,
         name: `${firstName.trim()} ${lastName.trim()}`,
@@ -58,7 +52,6 @@ export default function ProfileSetupScreen({ onComplete }: ProfileSetupScreenPro
         created_at: new Date().toISOString(),
       };
 
-      // Create profile
       const profile: UserProfile = {
         user_id: userId,
         first_name: firstName.trim(),
@@ -69,7 +62,6 @@ export default function ProfileSetupScreen({ onComplete }: ProfileSetupScreenPro
         updated_at: new Date().toISOString(),
       };
 
-      // Create initial streak (starting fresh)
       const streak: UserStreak = {
         user_id: userId,
         current_streak_days: 0,
@@ -78,7 +70,6 @@ export default function ProfileSetupScreen({ onComplete }: ProfileSetupScreenPro
         total_days_active: 0,
       };
 
-      // Create default notification settings
       const notificationSettings: NotificationSettings = {
         user_id: userId,
         enabled: true,
@@ -90,24 +81,11 @@ export default function ProfileSetupScreen({ onComplete }: ProfileSetupScreenPro
         quiet_end: '08:00',
       };
 
-      console.log('Saving data to storage...'); // Debug log
-
-      // Save all data
       await saveUser(user);
-      console.log('User saved'); // Debug log
-
       await saveUserProfile(profile);
-      console.log('Profile saved'); // Debug log
-
       await saveUserStreak(streak);
-      console.log('Streak saved'); // Debug log
-
       await saveNotificationSettings(notificationSettings);
-      console.log('Notifications saved'); // Debug log
 
-      console.log('All data saved successfully!'); // Debug log
-      console.log('All data saved successfully!'); // Debug log
-      console.log('Calling onComplete callback to return to main app');
       onComplete();
     } catch (error) {
       console.error('Error creating profile:', error);
@@ -118,130 +96,161 @@ export default function ProfileSetupScreen({ onComplete }: ProfileSetupScreenPro
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <ThemedView style={styles.content}>
-
-        {/* Header */}
-        <View style={styles.header}>
-          <ThemedText type="title">Create Your Profile</ThemedText>
-          <ThemedText style={styles.subtitle}>
-            Tell us a bit about yourself to personalize your kindness journey
-          </ThemedText>
-        </View>
-
-        {/* Form Fields */}
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>First Name *</ThemedText>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your first name"
-              value={firstName}
-              onChangeText={setFirstName}
-              autoCapitalize="words"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Last Name *</ThemedText>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your last name"
-              value={lastName}
-              onChangeText={setLastName}
-              autoCapitalize="words"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Email *</ThemedText>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your email address"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>City (Optional)</ThemedText>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your city"
-              value={city}
-              onChangeText={setCity}
-              autoCapitalize="words"
-            />
-          </View>
-
-          {/* Emotional State Selection */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>How are you feeling today?</ThemedText>
-            <View style={styles.emotionalGrid}>
-              {emotionalStates.map((state) => (
-                <TouchableOpacity
-                  key={state.value}
-                  style={[
-                    styles.emotionalOption,
-                    emotionalState === state.value && styles.emotionalOptionSelected
-                  ]}
-                  onPress={() => setEmotionalState(state.value)}
-                >
-                  <ThemedText style={styles.emotionalIcon}>{state.icon}</ThemedText>
-                  <ThemedText style={[
-                    styles.emotionalLabel,
-                    emotionalState === state.value && styles.emotionalLabelSelected
-                  ]}>
-                    {state.value.charAt(0).toUpperCase() + state.value.slice(1)}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-
-        {/* Create Profile Button */}
-        <TouchableOpacity
-          style={[styles.createButton, isCreating && styles.createButtonDisabled]}
-          onPress={completeSetup}
-          disabled={isCreating}
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <ThemedText type="defaultSemiBold" style={styles.createButtonText}>
-            {isCreating ? 'Creating Profile...' : 'Create Profile'}
-          </ThemedText>
-        </TouchableOpacity>
+          <ThemedView style={styles.content}>
+            <View style={styles.header}>
+              <ThemedText type="title" style={styles.headerTitle}>Create Your Profile</ThemedText>
+              <ThemedText style={styles.subtitle}>
+                Tell us a bit about yourself to personalize your kindness journey
+              </ThemedText>
+            </View>
 
-        <ThemedText style={styles.disclaimer}>
-          * Required fields
-        </ThemedText>
+            <View style={styles.form}>
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>First Name *</ThemedText>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your first name"
+                  placeholderTextColor="#999999"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  autoCapitalize="words"
+                />
+              </View>
 
-      </ThemedView>
-    </ScrollView>
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>Last Name *</ThemedText>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your last name"
+                  placeholderTextColor="#999999"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>Email *</ThemedText>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your email address"
+                  placeholderTextColor="#999999"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>City (Optional)</ThemedText>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your city"
+                  placeholderTextColor="#999999"
+                  value={city}
+                  onChangeText={setCity}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.label}>How are you feeling today?</ThemedText>
+                <View style={styles.emotionalGrid}>
+                  {emotionalStates.map((state) => (
+                    <TouchableOpacity
+                      key={state.value}
+                      style={[
+                        styles.emotionalOption,
+                        emotionalState === state.value && styles.emotionalOptionSelected
+                      ]}
+                      onPress={() => setEmotionalState(state.value)}
+                    >
+                      <ThemedText style={styles.emotionalIcon}>{state.icon}</ThemedText>
+                      <ThemedText style={[
+                        styles.emotionalLabel,
+                        emotionalState === state.value && styles.emotionalLabelSelected
+                      ]}>
+                        {state.label}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.createButton, isCreating && styles.createButtonDisabled]}
+              onPress={completeSetup}
+              disabled={isCreating}
+            >
+              <ThemedText type="defaultSemiBold" style={styles.createButtonText}>
+                {isCreating ? 'Creating Profile...' : 'Create Profile'}
+              </ThemedText>
+            </TouchableOpacity>
+
+            <ThemedText style={styles.disclaimer}>* Required fields</ThemedText>
+          </ThemedView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#40ae49',
+  },
   container: {
     flex: 1,
+    backgroundColor: '#40ae49',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   content: {
     padding: 20,
+    backgroundColor: 'transparent',
   },
   header: {
     alignItems: 'center',
     marginBottom: 30,
+    backgroundColor: 'transparent',
+  },
+  headerTitle: {
+    color: '#ffffff',
   },
   subtitle: {
     textAlign: 'center',
     marginTop: 10,
-    opacity: 0.8,
+    opacity: 0.9,
     lineHeight: 22,
+    color: '#ffffff',
   },
   form: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderRadius: 15,
     marginBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   inputGroup: {
     marginBottom: 20,
@@ -250,14 +259,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
+    color: '#000000',
   },
   input: {
-    backgroundColor: 'white',
+    backgroundColor: '#f2f2f2',
     padding: 15,
     borderRadius: 10,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#d4dcc4',
+    color: '#000000',
   },
   emotionalGrid: {
     flexDirection: 'row',
@@ -266,17 +277,17 @@ const styles = StyleSheet.create({
   },
   emotionalOption: {
     width: '30%',
-    backgroundColor: 'white',
+    backgroundColor: '#f2f2f2',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 10,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: '#d4dcc4',
   },
   emotionalOptionSelected: {
-    borderColor: '#58CC02',
-    backgroundColor: '#F0F8E8',
+    borderColor: '#40ae49',
+    backgroundColor: '#88c78d',
   },
   emotionalIcon: {
     fontSize: 24,
@@ -285,14 +296,14 @@ const styles = StyleSheet.create({
   emotionalLabel: {
     fontSize: 12,
     textAlign: 'center',
-    color: '#666',
+    color: '#000000',
   },
   emotionalLabelSelected: {
-    color: '#58CC02',
+    color: '#ffffff',
     fontWeight: '600',
   },
   createButton: {
-    backgroundColor: '#58CC02',
+    backgroundColor: '#febe10',
     padding: 18,
     borderRadius: 25,
     alignItems: 'center',
@@ -306,13 +317,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#A0A0A0',
   },
   createButtonText: {
-    color: 'white',
+    color: '#000000',
     fontSize: 18,
+    fontWeight: '600',
   },
   disclaimer: {
     textAlign: 'center',
     marginTop: 15,
     fontSize: 12,
-    opacity: 0.6,
+    opacity: 0.9,
+    color: '#ffffff',
   },
 });

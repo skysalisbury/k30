@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { borderRadius, colors, spacing, typography } from '@/src/styles/globalStyles';
 import { KindnessAct, User } from '@/src/utils/dataModels';
 import {
   getChallengeProgress,
@@ -8,13 +9,15 @@ import {
   getUser,
   getUserStreak,
   markChallengeDay,
+  saveChallengeProgress,
   saveKindnessAct,
   saveUserStreak
 } from '@/src/utils/storage';
 import moment from 'moment';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CalendarScreen() {
   const [kindnessActs, setKindnessActs] = useState<KindnessAct[]>([]);
@@ -24,7 +27,6 @@ export default function CalendarScreen() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
-  // Form state for adding kindness acts
   const [newActTitle, setNewActTitle] = useState('');
   const [newActDescription, setNewActDescription] = useState('');
   const [newActCategory, setNewActCategory] = useState<'personal' | 'community' | 'environmental' | 'random' | 'family' | 'work'>('random');
@@ -43,7 +45,6 @@ export default function CalendarScreen() {
   }, []);
 
   useEffect(() => {
-    // Update selected date acts when date or acts change
     const actsForDate = kindnessActs.filter(act => act.date === selectedDate);
     setSelectedDateActs(actsForDate);
   }, [selectedDate, kindnessActs]);
@@ -64,24 +65,21 @@ export default function CalendarScreen() {
     }
   };
 
-  // Create marked dates for calendar
   const getMarkedDates = () => {
     const marked: { [key: string]: any } = {};
 
-    // Mark dates with kindness acts
     kindnessActs.forEach(act => {
       marked[act.date] = {
         marked: true,
-        dotColor: '#58CC02',
-        selectedColor: '#58CC02',
+        dotColor: '#40ae49',
+        selectedColor: '#40ae49',
       };
     });
 
-    // Mark selected date
     marked[selectedDate] = {
       ...marked[selectedDate],
       selected: true,
-      selectedColor: '#FF6B6B',
+      selectedColor: '#febe10',
     };
 
     return marked;
@@ -118,19 +116,16 @@ export default function CalendarScreen() {
       console.log('Saving act:', newAct);
       await saveKindnessAct(newAct);
 
-      // Only update streak and challenge on the FIRST act of the day
       const todayActs = await getTodaysKindnessActs();
-      const isFirstActToday = todayActs.length === 1; // Will be 1 because we just saved one
+      const isFirstActToday = todayActs.length === 1;
 
       if (selectedDate === moment().format('YYYY-MM-DD') && isFirstActToday) {
-        // Update streak
         const streak = await getUserStreak();
         if (streak) {
           const yesterday = moment().subtract(1, 'days').format('YYYY-MM-DD');
           const wasActiveYesterday = streak.last_activity_date === yesterday;
           const isFirstEver = !streak.last_activity_date;
 
-          // Calculate new streak: reset to 1 if there was a gap, otherwise increment
           const newStreakDays = (wasActiveYesterday || isFirstEver)
             ? streak.current_streak_days + 1
             : 1;
@@ -146,24 +141,38 @@ export default function CalendarScreen() {
           console.log('Streak updated:', updatedStreak);
         }
 
-        // Update challenge progress - only once per day
         const challenge = await getChallengeProgress();
         if (challenge && challenge.is_active) {
-          const startDate = moment(challenge.start_date);
-          const today = moment();
-          const daysSinceStart = today.diff(startDate, 'days') + 1;
+          const yesterday = moment().subtract(1, 'days').format('YYYY-MM-DD');
+          const lastCompletedDay = challenge.completed_days.length > 0
+            ? Math.max(...challenge.completed_days)
+            : 0;
 
-          if (daysSinceStart <= 30 && !challenge.completed_days.includes(daysSinceStart)) {
-            await markChallengeDay(daysSinceStart);
-            console.log(`Challenge day ${daysSinceStart} marked complete`);
+          const allActs = await getKindnessActs();
+          const yesterdayActs = allActs.filter(act => act.date === yesterday);
+          const hasYesterdayAct = yesterdayActs.length > 0;
+
+          const isConsecutive = lastCompletedDay === 0 || hasYesterdayAct;
+
+          if (isConsecutive) {
+            const nextDay = lastCompletedDay + 1;
+            if (nextDay <= 30 && !challenge.completed_days.includes(nextDay)) {
+              await markChallengeDay(nextDay);
+              console.log(`Challenge day ${nextDay} marked complete (consecutive)`);
+            }
+          } else {
+            console.log('Missed a day - resetting challenge');
+            challenge.completed_days = [1];
+            challenge.current_day = 1;
+            challenge.last_updated = new Date().toISOString();
+            await saveChallengeProgress(challenge);
+            console.log('Challenge reset to day 1 due to gap');
           }
         }
       }
 
-      // Refresh data
       await loadData();
 
-      // Reset form
       setNewActTitle('');
       setNewActDescription('');
       setNewActCategory('random');
@@ -179,210 +188,242 @@ export default function CalendarScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.centerContent}>
-          <ThemedText>Loading calendar...</ThemedText>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <ThemedView style={styles.container}>
+          <ThemedView style={styles.centerContent}>
+            <ThemedText>Loading calendar...</ThemedText>
+          </ThemedView>
         </ThemedView>
-      </ThemedView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <ThemedView style={styles.content}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <ThemedView style={styles.content}>
 
-        {/* Calendar */}
-        <ThemedView style={styles.calendarContainer}>
-          <Calendar
-            current={selectedDate}
-            onDayPress={(day) => setSelectedDate(day.dateString)}
-            markedDates={getMarkedDates()}
-            theme={{
-              backgroundColor: '#ffffff',
-              calendarBackground: '#ffffff',
-              textSectionTitleColor: '#b6c1cd',
-              selectedDayBackgroundColor: '#FF6B6B',
-              selectedDayTextColor: '#ffffff',
-              todayTextColor: '#58CC02',
-              dayTextColor: '#2d4150',
-              textDisabledColor: '#d9e1e8',
-              dotColor: '#58CC02',
-              selectedDotColor: '#ffffff',
-              arrowColor: '#58CC02',
-              disabledArrowColor: '#d9e1e8',
-              monthTextColor: '#2d4150',
-              indicatorColor: '#58CC02',
-            }}
-          />
-        </ThemedView>
+            {/* Calendar */}
+            <ThemedView style={styles.calendarContainer}>
+              <Calendar
+                current={selectedDate}
+                onDayPress={(day) => setSelectedDate(day.dateString)}
+                markedDates={getMarkedDates()}
+                theme={{
+                  backgroundColor: '#ffffff',
+                  calendarBackground: '#ffffff',
+                  textSectionTitleColor: '#666666',
+                  selectedDayBackgroundColor: '#febe10',
+                  selectedDayTextColor: '#000000',
+                  todayTextColor: '#40ae49',
+                  dayTextColor: '#000000',
+                  textDisabledColor: '#d4dcc4',
+                  dotColor: '#40ae49',
+                  selectedDotColor: '#000000',
+                  arrowColor: '#40ae49',
+                  disabledArrowColor: '#d4dcc4',
+                  monthTextColor: '#000000',
+                  indicatorColor: '#40ae49',
+                }}
+              />
+            </ThemedView>
 
-        {/* Selected Date Info */}
-        <ThemedView style={styles.dateInfoContainer}>
-          <ThemedText type="subtitle">
-            {moment(selectedDate).format('MMMM Do, YYYY')}
-          </ThemedText>
-          <ThemedText style={styles.dateSubtext}>
-            {selectedDateActs.length} act{selectedDateActs.length !== 1 ? 's' : ''} of kindness
-          </ThemedText>
-        </ThemedView>
-
-        {/* Acts for Selected Date */}
-        <ThemedView style={styles.actsSection}>
-          {selectedDateActs.length > 0 ? (
-            selectedDateActs.map((act) => (
-              <ThemedView key={act.id} style={styles.actCard}>
-                <View style={styles.actHeader}>
-                  <ThemedText type="defaultSemiBold" style={styles.darkText}>
-                    {act.title}
-                  </ThemedText>
-                  <ThemedText style={styles.categoryBadge}>
-                    {categories.find(cat => cat.value === act.category)?.icon} {act.category}
-                  </ThemedText>
-                </View>
-                {act.description ? (
-                  <ThemedText style={styles.darkText}>
-                    {act.description}
-                  </ThemedText>
-                ) : null}
-                <ThemedText style={styles.actMeta}>
-                  {act.impact_level} impact • Feeling {act.mood_after}
-                </ThemedText>
-              </ThemedView>
-            ))
-          ) : (
-            <ThemedView style={styles.emptyState}>
-              <ThemedText style={styles.emptyText}>
-                No kindness acts recorded for this day
+            {/* Selected Date Info */}
+            <ThemedView style={styles.dateInfoContainer}>
+              <ThemedText type="subtitle">
+                {moment(selectedDate).format('MMMM Do, YYYY')}
               </ThemedText>
-              <ThemedText style={styles.emptySubtext}>
-                Add your first act of kindness below
+              <ThemedText style={styles.dateSubtext}>
+                {selectedDateActs.length} act{selectedDateActs.length !== 1 ? 's' : ''} of kindness
               </ThemedText>
             </ThemedView>
-          )}
-        </ThemedView>
 
-        {/* Add Kindness Act Button */}
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowAddModal(!showAddModal)}
-        >
-          <ThemedText type="defaultSemiBold" style={styles.addButtonText}>
-            {showAddModal ? 'Cancel' : `Add Kindness Act for ${moment(selectedDate).format('MMM Do')}`}
-          </ThemedText>
-        </TouchableOpacity>
-
-        {/* Add Form (shown when showAddModal is true) */}
-        {showAddModal && (
-          <ThemedView style={styles.addForm}>
-            <ThemedText type="subtitle" style={styles.formTitle}>
-              Record Your Kindness
-            </ThemedText>
-
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>What did you do? *</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., Helped elderly neighbor with groceries"
-                placeholderTextColor="#999"
-                value={newActTitle}
-                onChangeText={setNewActTitle}
-                multiline
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>Details (optional)</ThemedText>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Tell us more about what happened..."
-                placeholderTextColor="#999"
-                value={newActDescription}
-                onChangeText={setNewActDescription}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>Category</ThemedText>
-              <View style={styles.categoryGrid}>
-                {categories.map((category) => (
-                  <TouchableOpacity
-                    key={category.value}
-                    style={[
-                      styles.categoryOption,
-                      newActCategory === category.value && styles.categorySelected
-                    ]}
-                    onPress={() => setNewActCategory(category.value)}
-                  >
-                    <ThemedText style={styles.categoryIcon}>
-                      {category.icon}
+            {/* Acts for Selected Date */}
+            <ThemedView style={styles.actsSection}>
+              {selectedDateActs.length > 0 ? (
+                selectedDateActs.map((act) => (
+                  <ThemedView key={act.id} style={styles.actCard}>
+                    <View style={styles.actHeader}>
+                      <ThemedText type="defaultSemiBold" style={styles.darkText}>
+                        {act.title}
+                      </ThemedText>
+                      <ThemedText style={styles.categoryBadge}>
+                        {categories.find(cat => cat.value === act.category)?.icon} {act.category}
+                      </ThemedText>
+                    </View>
+                    {act.description ? (
+                      <ThemedText style={styles.darkText}>
+                        {act.description}
+                      </ThemedText>
+                    ) : null}
+                    <ThemedText style={styles.actMeta}>
+                      {act.impact_level} impact • Feeling {act.mood_after}
                     </ThemedText>
-                    <ThemedText style={[
-                      styles.categoryLabel,
-                      newActCategory === category.value && styles.categoryLabelSelected
-                    ]}>
-                      {category.label}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+                  </ThemedView>
+                ))
+              ) : (
+                <ThemedView style={styles.emptyState}>
+                  <ThemedText style={styles.emptyText}>
+                    No kindness acts recorded for this day
+                  </ThemedText>
+                  <ThemedText style={styles.emptySubtext}>
+                    Tap the button below to add one!
+                  </ThemedText>
+                </ThemedView>
+              )}
+            </ThemedView>
 
-            <TouchableOpacity style={styles.saveButton} onPress={addKindnessAct}>
-              <ThemedText type="defaultSemiBold" style={styles.saveButtonText}>
-                Save Kindness Act
+            {/* Add Kindness Act Button */}
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setShowAddModal(!showAddModal)}
+            >
+              <ThemedText type="defaultSemiBold" style={styles.addButtonText}>
+                {showAddModal ? 'Cancel' : `Add Kindness Act for ${moment(selectedDate).format('MMM Do')}`}
               </ThemedText>
             </TouchableOpacity>
-          </ThemedView>
-        )}
 
-      </ThemedView>
-    </ScrollView>
+            {/* Add Form (shown when showAddModal is true) */}
+            {showAddModal && (
+              <ThemedView style={styles.addForm}>
+                <ThemedText type="subtitle" style={styles.formTitle}>
+                  Record Your Kindness
+                </ThemedText>
+
+                <View style={styles.inputGroup}>
+                  <ThemedText style={styles.label}>What did you do? *</ThemedText>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g., Helped elderly neighbor with groceries"
+                    placeholderTextColor={colors.text.light}
+                    value={newActTitle}
+                    onChangeText={setNewActTitle}
+                    multiline
+                    returnKeyType="next"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <ThemedText style={styles.label}>Details (optional)</ThemedText>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    placeholder="Tell us more about what happened..."
+                    placeholderTextColor={colors.text.light}
+                    value={newActDescription}
+                    onChangeText={setNewActDescription}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <ThemedText style={styles.label}>Category</ThemedText>
+                  <View style={styles.categoryGrid}>
+                    {categories.map((category) => (
+                      <TouchableOpacity
+                        key={category.value}
+                        style={[
+                          styles.categoryOption,
+                          newActCategory === category.value && styles.categorySelected
+                        ]}
+                        onPress={() => setNewActCategory(category.value)}
+                      >
+                        <ThemedText style={styles.categoryIcon}>
+                          {category.icon}
+                        </ThemedText>
+                        <ThemedText style={[
+                          styles.categoryLabel,
+                          newActCategory === category.value && styles.categoryLabelSelected
+                        ]}>
+                          {category.label}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <TouchableOpacity style={styles.saveButton} onPress={addKindnessAct}>
+                  <ThemedText type="defaultSemiBold" style={styles.saveButtonText}>
+                    Save Kindness Act
+                  </ThemedText>
+                </TouchableOpacity>
+              </ThemedView>
+            )}
+
+          </ThemedView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#40ae49',
+  },
   container: {
     flex: 1,
+    backgroundColor: '#40ae49',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   content: {
-    padding: 20,
+    padding: spacing.md,
+    backgroundColor: 'transparent',
   },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
+
   calendarContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    padding: 10,
-    marginBottom: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: borderRadius.lg,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
+
   dateInfoContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.md,
+    backgroundColor: 'transparent',
   },
   dateSubtext: {
-    opacity: 0.7,
-    marginTop: 5,
+    opacity: 0.9,
+    marginTop: spacing.xs,
+    color: '#ffffff',
   },
+
   actsSection: {
-    marginBottom: 20,
+    marginBottom: spacing.md,
+    backgroundColor: 'transparent',
   },
   actCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    backgroundColor: '#ffffff',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
     borderLeftWidth: 4,
-    borderLeftColor: '#58CC02',
+    borderLeftColor: '#febe10',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -393,84 +434,98 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
+    backgroundColor: 'transparent',
   },
   categoryBadge: {
-    fontSize: 12,
-    color: '#58CC02',
-    backgroundColor: '#F0F8E8',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    fontSize: typography.sizes.xs,
+    color: '#40ae49',
+    backgroundColor: '#f2f2f2',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
   },
   darkText: {
     color: '#000000',
   },
   actMeta: {
-    fontSize: 12,
+    fontSize: typography.sizes.xs,
     opacity: 0.7,
-    marginTop: 8,
+    marginTop: spacing.sm,
     color: '#000000',
   },
+
   emptyState: {
     alignItems: 'center',
-    padding: 40,
+    padding: spacing.xl,
+    backgroundColor: 'transparent',
   },
   emptyText: {
-    fontSize: 16,
-    marginBottom: 8,
+    fontSize: typography.sizes.md,
+    marginBottom: spacing.sm,
+    color: '#ffffff',
   },
   emptySubtext: {
-    opacity: 0.7,
+    opacity: 0.9,
+    color: '#ffffff',
   },
+
   addButton: {
-    backgroundColor: '#58CC02',
-    padding: 15,
-    borderRadius: 25,
+    backgroundColor: '#febe10',
+    padding: spacing.md,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  addForm: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 15,
+    marginBottom: spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
   },
+  addButtonText: {
+    color: '#000000',
+    fontSize: typography.sizes.md,
+    fontWeight: '600',
+  },
+
+  addForm: {
+    backgroundColor: '#ffffff',
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
   formTitle: {
     textAlign: 'center',
-    marginBottom: 20,
-    color: '#000000',
+    marginBottom: spacing.md,
+    color: '#40ae49',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: spacing.md,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    marginBottom: spacing.sm,
     color: '#000000',
   },
   input: {
-    backgroundColor: '#F8F9FA',
-    padding: 15,
-    borderRadius: 10,
-    fontSize: 16,
+    backgroundColor: '#f2f2f2',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    fontSize: typography.sizes.md,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#d4dcc4',
     color: '#000000',
   },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
   },
+
   categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -478,39 +533,46 @@ const styles = StyleSheet.create({
   },
   categoryOption: {
     width: '30%',
-    backgroundColor: '#F8F9FA',
-    padding: 12,
-    borderRadius: 10,
+    backgroundColor: '#f2f2f2',
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: '#d4dcc4',
   },
   categorySelected: {
-    borderColor: '#58CC02',
-    backgroundColor: '#F0F8E8',
+    borderColor: '#40ae49',
+    backgroundColor: '#88c78d',
   },
   categoryIcon: {
     fontSize: 20,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   categoryLabel: {
-    fontSize: 11,
+    fontSize: typography.sizes.xs,
     textAlign: 'center',
-    color: '#666',
+    color: '#000000',
   },
   categoryLabelSelected: {
-    color: '#58CC02',
-    fontWeight: '600',
+    color: '#ffffff',
+    fontWeight: typography.weights.semibold,
   },
+
   saveButton: {
-    backgroundColor: '#58CC02',
-    padding: 15,
-    borderRadius: 25,
+    backgroundColor: '#40ae49',
+    padding: spacing.md,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   saveButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#ffffff',
+    fontSize: typography.sizes.md,
+    fontWeight: '600',
   },
 });

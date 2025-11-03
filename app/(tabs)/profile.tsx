@@ -1,17 +1,27 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import EditNotificationSettings from '@/src/screens/EditNotificationSettings';
 import EditProfileScreen from '@/src/screens/EditProfileScreen';
+import { borderRadius, colors, spacing, typography } from '@/src/styles/globalStyles';
 import { NotificationSettings, User, UserProfile, UserStreak } from '@/src/utils/dataModels';
+import {
+  cancelAllNotifications,
+  registerForPushNotificationsAsync,
+  scheduleDailyReminders,
+  sendTestNotification
+} from '@/src/utils/notificationService';
 import {
   clearAllData,
   getNotificationSettings,
   getUser,
   getUserProfile,
   getUserStreak,
+  recalculateStreak,
   saveNotificationSettings
 } from '@/src/utils/storage';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState<User | null>(null);
@@ -20,6 +30,7 @@ export default function ProfileScreen() {
   const [notifications, setNotifications] = useState<NotificationSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showEditNotifications, setShowEditNotifications] = useState(false);
 
   useEffect(() => {
     loadProfileData();
@@ -34,7 +45,6 @@ export default function ProfileScreen() {
       const streakData = await getUserStreak();
       let notificationData = await getNotificationSettings();
 
-      // Create default notification settings if none exist
       if (!notificationData && userData) {
         notificationData = {
           user_id: userData.id,
@@ -60,25 +70,103 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleRecalculateStreak = async () => {
+    try {
+      await recalculateStreak();
+      await loadProfileData();
+      Alert.alert(
+        'Success!',
+        'Your streak has been recalculated based on your calendar data.'
+      );
+    } catch (error) {
+      console.error('Error recalculating streak:', error);
+      Alert.alert('Error', 'Failed to recalculate streak.');
+    }
+  };
+
   const toggleNotifications = async () => {
     if (!notifications || !user) return;
 
     try {
+      const newEnabled = !notifications.enabled;
+
+      console.log('Toggle notifications:', {
+        currentState: notifications.enabled,
+        newState: newEnabled
+      });
+
+      if (newEnabled) {
+        const hasPermission = await registerForPushNotificationsAsync();
+
+        if (!hasPermission) {
+          Alert.alert(
+            'Permission Required',
+            'Please enable notifications in your device settings.'
+          );
+          return;
+        }
+
+        // Save settings FIRST before scheduling
+        const updatedSettings: NotificationSettings = {
+          ...notifications,
+          enabled: true,
+        };
+
+        await saveNotificationSettings(updatedSettings);
+        console.log('Settings saved:', updatedSettings);
+
+        // Then schedule with the updated settings
+        await scheduleDailyReminders();
+
+        Alert.alert(
+          'Notifications Enabled! 🎉',
+          `You'll receive reminders every 2 minutes for testing. Check your notifications!`
+        );
+      } else {
+        await cancelAllNotifications();
+
+        Alert.alert(
+          'Notifications Disabled',
+          "You won't receive any more reminders."
+        );
+      }
+
       const updatedSettings: NotificationSettings = {
         ...notifications,
-        enabled: !notifications.enabled,
+        enabled: newEnabled,
       };
 
       await saveNotificationSettings(updatedSettings);
       setNotifications(updatedSettings);
 
+      console.log('Final notification state:', updatedSettings.enabled);
+    } catch (error) {
+      console.error('Error updating notifications:', error);
+      Alert.alert('Error', 'Could not update notification settings');
+    }
+  };
+
+  const handleTestNotification = async () => {
+    try {
+      const hasPermission = await registerForPushNotificationsAsync();
+
+      if (!hasPermission) {
+        Alert.alert(
+          'Permission Required',
+          'Please enable notifications in your device settings first.'
+        );
+        return;
+      }
+
+      await sendTestNotification();
+
       Alert.alert(
-        'Settings Updated',
-        `Notifications ${updatedSettings.enabled ? 'enabled' : 'disabled'}`
+        'Test Sent! 🔔',
+        'You should receive a test notification in 2 seconds.'
       );
     } catch (error) {
-      console.error('Error updating notification settings:', error);
-      Alert.alert('Error', 'Could not update notification settings');
+      console.error('Error sending test:', error);
+      Alert.alert('Error', 'Could not send test notification');
     }
   };
 
@@ -99,325 +187,346 @@ export default function ProfileScreen() {
   };
 
   const handleDeleteProfile = async () => {
-    console.log('Delete button clicked!');
-    console.log('Bypassing alert - calling clearAllData directly');
-
     try {
-      console.log('Before clearAllData');
-      const userBefore = await getUser();
-      const profileBefore = await getUserProfile();
-      console.log('User before:', userBefore);
-      console.log('Profile before:', profileBefore);
-
       await clearAllData();
-      console.log('After clearAllData - success');
-
-      const userAfter = await getUser();
-      const profileAfter = await getUserProfile();
-      console.log('User after:', userAfter);
-      console.log('Profile after:', profileAfter);
-
-      console.log('Resetting component state...');
       setUser(null);
       setProfile(null);
       setStreak(null);
       setNotifications(null);
-
-      console.log('Reloading profile data...');
       loadProfileData();
     } catch (error) {
-      console.error('Error in clearAllData:', error);
+      console.error('Error clearing data:', error);
     }
   };
 
   if (loading) {
     return (
-      <ThemedView style={styles.container}>
-        <ThemedText>Loading profile...</ThemedText>
-      </ThemedView>
-    );
-  }
-
-  // Show edit profile screen if in edit mode
-  if (showEditProfile) {
-    return (
-      <EditProfileScreen
-        onComplete={() => {
-          setShowEditProfile(false);
-          loadProfileData(); // Reload data to show updates
-        }}
-      />
-    );
-  }
-
-  // Show message if no user data exists
-  if (!user || !profile) {
-    return (
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.centerContent}>
-          <ThemedText type="title">Welcome!</ThemedText>
-          <ThemedText style={styles.noProfileText}>
-            Let's get your profile set up first.
-          </ThemedText>
-          <TouchableOpacity
-            style={styles.setupButton}
-            onPress={() => {
-              Alert.alert(
-                'Profile Setup',
-                'Please go to the Home tab to complete your profile setup.'
-              );
-            }}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.setupButtonText}>
-              Set Up Profile
-            </ThemedText>
-          </TouchableOpacity>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <ThemedView style={styles.container}>
+          <ThemedText style={styles.loadingText}>Loading profile...</ThemedText>
         </ThemedView>
-      </ThemedView>
+      </SafeAreaView>
+    );
+  }
+
+  if (showEditProfile || !user || !profile) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <EditProfileScreen
+          onComplete={() => {
+            setShowEditProfile(false);
+            loadProfileData();
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (showEditNotifications && notifications) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <EditNotificationSettings
+          currentSettings={notifications}
+          onComplete={() => {
+            setShowEditNotifications(false);
+            loadProfileData();
+          }}
+        />
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <ThemedView style={styles.content}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <ThemedView style={styles.content}>
 
-        {/* Profile Header */}
-        <ThemedView style={styles.profileHeader}>
-          <ThemedView style={styles.avatar}>
-            <ThemedText style={styles.avatarText}>
-              {(profile?.first_name?.[0] || user?.name?.[0] || 'K').toUpperCase()}
+          <ThemedView style={styles.profileHeader}>
+            <ThemedView style={styles.avatar}>
+              <ThemedText style={styles.avatarText}>
+                {(profile?.first_name?.[0] || user?.name?.[0] || 'K').toUpperCase()}
+              </ThemedText>
+            </ThemedView>
+            <ThemedText type="title" style={styles.headerTitle}>
+              {profile?.first_name} {profile?.last_name}
+            </ThemedText>
+            <ThemedText type="subtitle" style={styles.headerSubtitle}>
+              {profile?.location_city || 'Kindness Warrior'}
+            </ThemedText>
+            <ThemedText style={styles.headerInfo}>
+              Feeling {profile?.emotional_state || 'good'} • {profile?.mental_wellbeing?.replace('_', ' ') || 'good'}
             </ThemedText>
           </ThemedView>
-          <ThemedText type="title">
-            {profile?.first_name} {profile?.last_name}
-          </ThemedText>
-          <ThemedText type="subtitle">
-            {profile?.location_city || 'Kindness Warrior'}
-          </ThemedText>
-          <ThemedText>
-            Feeling {profile?.emotional_state || 'good'} • {profile?.mental_wellbeing?.replace('_', ' ') || 'good'}
-          </ThemedText>
-        </ThemedView>
 
-        {/* Stats Grid */}
-        <ThemedView style={styles.statsGrid}>
-          <ThemedView style={styles.statCard}>
-            <ThemedText type="title" style={styles.darkText}>
-              {streak?.current_streak_days || 0}
-            </ThemedText>
-            <ThemedText style={styles.darkText}>Current Streak</ThemedText>
-          </ThemedView>
+          <ThemedView style={styles.statsGrid}>
+            <ThemedView style={styles.statCard}>
+              <ThemedText type="title" style={styles.statNumber}>
+                {streak?.current_streak_days || 0}
+              </ThemedText>
+              <ThemedText style={styles.statLabel}>Current Streak</ThemedText>
+            </ThemedView>
 
-          <ThemedView style={styles.statCard}>
-            <ThemedText type="title" style={styles.darkText}>
-              {streak?.longest_streak_days || 0}
-            </ThemedText>
-            <ThemedText style={styles.darkText}>Best Streak</ThemedText>
-          </ThemedView>
+            <ThemedView style={styles.statCard}>
+              <ThemedText type="title" style={styles.statNumber}>
+                {streak?.longest_streak_days || 0}
+              </ThemedText>
+              <ThemedText style={styles.statLabel}>Best Streak</ThemedText>
+            </ThemedView>
 
-          <ThemedView style={styles.statCard}>
-            <ThemedText type="title" style={styles.darkText}>
-              {streak?.total_days_active || 0}
-            </ThemedText>
-            <ThemedText style={styles.darkText}>Total Days</ThemedText>
-          </ThemedView>
+            <ThemedView style={styles.statCard}>
+              <ThemedText type="title" style={styles.statNumber}>
+                {streak?.total_days_active || 0}
+              </ThemedText>
+              <ThemedText style={styles.statLabel}>Total Days</ThemedText>
+            </ThemedView>
 
-          <ThemedView style={styles.statCard}>
-            <ThemedText type="title" style={styles.darkText}>
-              {user ? Math.max(1, Math.floor((Date.now() - new Date(user.created_at).getTime()) / (1000 * 60 * 60 * 24))) : 0}
-            </ThemedText>
-            <ThemedText style={styles.darkText}>Days Joined</ThemedText>
-          </ThemedView>
-        </ThemedView>
-
-        {/* Notification Settings */}
-        <ThemedView style={styles.settingsSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>
-            Notification Settings
-          </ThemedText>
-
-          <ThemedView style={styles.settingCard}>
-            <ThemedView style={styles.settingRow}>
-              <ThemedView style={styles.settingInfo}>
-                <ThemedText type="defaultSemiBold" style={styles.darkText}>
-                  Push Notifications
-                </ThemedText>
-                <ThemedText style={styles.darkText}>
-                  Get reminded to spread kindness
-                </ThemedText>
-              </ThemedView>
-              <Switch
-                value={notifications?.enabled || false}
-                onValueChange={toggleNotifications}
-                trackColor={{ false: '#E0E0E0', true: '#58CC02' }}
-                thumbColor={notifications?.enabled ? '#ffffff' : '#f4f3f4'}
-              />
+            <ThemedView style={styles.statCard}>
+              <ThemedText type="title" style={styles.statNumber}>
+                {user ? Math.max(1, Math.floor((Date.now() - new Date(user.created_at).getTime()) / (1000 * 60 * 60 * 24))) : 0}
+              </ThemedText>
+              <ThemedText style={styles.statLabel}>Days Joined</ThemedText>
             </ThemedView>
           </ThemedView>
 
-          {notifications?.enabled && (
-            <>
-              <ThemedView style={styles.settingCard}>
-                <ThemedText type="defaultSemiBold" style={styles.darkText}>
-                  Reminder Schedule
-                </ThemedText>
-                <ThemedText style={styles.darkText}>
-                  Every {notifications.frequency_hours} hours
-                </ThemedText>
-                <ThemedText style={styles.settingDetail}>
-                  {notifications.preferred_time_1} and {notifications.preferred_time_2}
-                </ThemedText>
-              </ThemedView>
+          <ThemedView style={styles.settingsSection}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Notification Settings
+            </ThemedText>
 
-              <ThemedView style={styles.settingCard}>
-                <ThemedView style={styles.settingRow}>
-                  <ThemedView style={styles.settingInfo}>
-                    <ThemedText type="defaultSemiBold" style={styles.darkText}>
-                      Quiet Hours
-                    </ThemedText>
-                    <ThemedText style={styles.darkText}>
-                      {notifications.quiet_start} - {notifications.quiet_end}
-                    </ThemedText>
-                  </ThemedView>
-                  <Switch
-                    value={notifications?.quiet_hours_enabled || false}
-                    onValueChange={toggleQuietHours}
-                    trackColor={{ false: '#E0E0E0', true: '#58CC02' }}
-                    thumbColor={notifications?.quiet_hours_enabled ? '#ffffff' : '#f4f3f4'}
-                  />
+            <ThemedView style={styles.settingCard}>
+              <ThemedView style={styles.settingRow}>
+                <ThemedView style={styles.settingInfo}>
+                  <ThemedText type="defaultSemiBold" style={styles.darkText}>
+                    Push Notifications
+                  </ThemedText>
+                  <ThemedText style={styles.darkText}>
+                    Get reminded to spread kindness
+                  </ThemedText>
                 </ThemedView>
+                <Switch
+                  value={notifications?.enabled || false}
+                  onValueChange={toggleNotifications}
+                  trackColor={{ false: '#d4dcc4', true: '#40ae49' }}
+                  thumbColor={notifications?.enabled ? '#ffffff' : '#f2f2f2'}
+                />
               </ThemedView>
-            </>
-          )}
-        </ThemedView>
+            </ThemedView>
 
-        {/* Mental Wellbeing Section */}
-        <ThemedView style={styles.wellbeingSection}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>
-            Wellbeing Check-in
-          </ThemedText>
+            {notifications?.enabled && (
+              <>
+                <ThemedView style={styles.settingCard}>
+                  <ThemedText type="defaultSemiBold" style={styles.darkText}>
+                    Reminder Schedule
+                  </ThemedText>
+                  <ThemedText style={styles.darkText}>
+                    Every {notifications.frequency_hours} hours
+                  </ThemedText>
+                  <ThemedText style={styles.settingDetail}>
+                    {notifications.preferred_time_1} and {notifications.preferred_time_2}
+                  </ThemedText>
+                  <TouchableOpacity
+                    style={styles.editTimesButton}
+                    onPress={() => setShowEditNotifications(true)}
+                  >
+                    <ThemedText style={styles.editTimesButtonText}>
+                      ✏️ Edit Times
+                    </ThemedText>
+                  </TouchableOpacity>
+                </ThemedView>
 
-          <ThemedView style={styles.wellbeingCard}>
-            <ThemedText type="defaultSemiBold" style={styles.darkText}>
-              Current Emotional State
-            </ThemedText>
-            <ThemedText style={[styles.darkText, styles.emotionalState]}>
-              {profile?.emotional_state ?
-                profile.emotional_state.charAt(0).toUpperCase() + profile.emotional_state.slice(1) :
-                'Not set'}
-            </ThemedText>
+                <ThemedView style={styles.settingCard}>
+                  <ThemedView style={styles.settingRow}>
+                    <ThemedView style={styles.settingInfo}>
+                      <ThemedText type="defaultSemiBold" style={styles.darkText}>
+                        Quiet Hours
+                      </ThemedText>
+                      <ThemedText style={styles.darkText}>
+                        {notifications.quiet_start} - {notifications.quiet_end}
+                      </ThemedText>
+                    </ThemedView>
+                    <Switch
+                      value={notifications?.quiet_hours_enabled || false}
+                      onValueChange={toggleQuietHours}
+                      trackColor={{ false: '#d4dcc4', true: '#40ae49' }}
+                      thumbColor={notifications?.quiet_hours_enabled ? '#ffffff' : '#f2f2f2'}
+                    />
+                  </ThemedView>
+                </ThemedView>
 
-            <ThemedText type="defaultSemiBold" style={[styles.darkText, { marginTop: 15 }]}>
-              Mental Wellbeing
-            </ThemedText>
-            <ThemedText style={[styles.darkText, styles.wellbeingLevel]}>
-              {profile?.mental_wellbeing ?
-                profile.mental_wellbeing.replace('_', ' ').charAt(0).toUpperCase() +
-                profile.mental_wellbeing.replace('_', ' ').slice(1) :
-                'Not set'}
-            </ThemedText>
+                <TouchableOpacity style={styles.testButton} onPress={handleTestNotification}>
+                  <ThemedText type="defaultSemiBold" style={styles.testButtonText}>
+                    🔔 Send Test Notification
+                  </ThemedText>
+                </TouchableOpacity>
+              </>
+            )}
           </ThemedView>
+
+          <ThemedView style={styles.wellbeingSection}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Wellbeing Check-in
+            </ThemedText>
+
+            <ThemedView style={styles.wellbeingCard}>
+              <ThemedText type="defaultSemiBold" style={styles.darkText}>
+                Current Emotional State
+              </ThemedText>
+              <ThemedText style={[styles.darkText, styles.emotionalState]}>
+                {profile?.emotional_state ?
+                  profile.emotional_state.charAt(0).toUpperCase() + profile.emotional_state.slice(1) :
+                  'Not set'}
+              </ThemedText>
+
+              <ThemedText type="defaultSemiBold" style={[styles.darkText, { marginTop: 15 }]}>
+                Mental Wellbeing
+              </ThemedText>
+              <ThemedText style={[styles.darkText, styles.wellbeingLevel]}>
+                {profile?.mental_wellbeing ?
+                  profile.mental_wellbeing.replace('_', ' ').charAt(0).toUpperCase() +
+                  profile.mental_wellbeing.replace('_', ' ').slice(1) :
+                  'Not set'}
+              </ThemedText>
+            </ThemedView>
+          </ThemedView>
+
+          <TouchableOpacity style={styles.recalculateButton} onPress={handleRecalculateStreak}>
+            <ThemedText type="defaultSemiBold" style={styles.recalculateButtonText}>
+              🔄 Fix Streak Counter
+            </ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteProfile}>
+            <ThemedText type="defaultSemiBold" style={styles.deleteButtonText}>
+              Delete Profile (Testing)
+            </ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.editButton} onPress={() => setShowEditProfile(true)}>
+            <ThemedText type="defaultSemiBold" style={styles.editButtonText}>
+              Edit Profile
+            </ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.shareButton}>
+            <ThemedText type="defaultSemiBold" style={styles.shareButtonText}>
+              Invite Friends
+            </ThemedText>
+          </TouchableOpacity>
+
         </ThemedView>
-
-        {/* Action Buttons */}
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteProfile}>
-          <ThemedText type="defaultSemiBold" style={styles.deleteButtonText}>
-            Delete Profile (Testing)
-          </ThemedText>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.editButton} onPress={() => setShowEditProfile(true)}>
-          <ThemedText type="defaultSemiBold" style={styles.editButtonText}>
-            Edit Profile
-          </ThemedText>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.shareButton}>
-          <ThemedText type="defaultSemiBold" style={styles.shareButtonText}>
-            Invite Friends
-          </ThemedText>
-        </TouchableOpacity>
-
-      </ThemedView>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-// ... (keep all the existing styles exactly the same)
 const styles = StyleSheet.create({
+  // MAIN BACKGROUND - Primary Green
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#40ae49',
+  },
   container: {
     flex: 1,
+    backgroundColor: '#40ae49',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   content: {
-    padding: 20,
+    padding: spacing.md,
+    backgroundColor: 'transparent',
   },
-  centerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+  loadingText: {
+    color: '#ffffff',
   },
-  noProfileText: {
-    textAlign: 'center',
-    marginTop: 15,
-    lineHeight: 22,
-  },
+
+  // PROFILE HEADER - White text on green
   profileHeader: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: spacing.xl,
+    backgroundColor: 'transparent',
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#58CC02',
+    backgroundColor: '#febe10',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: spacing.md,
   },
   avatarText: {
     fontSize: 36,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: typography.weights.bold,
+    color: '#000000',
+  },
+  headerTitle: {
+    color: '#ffffff',
+  },
+  headerSubtitle: {
+    color: '#ffffff',
+    opacity: 0.9,
+  },
+  headerInfo: {
+    color: '#ffffff',
+    opacity: 0.9,
   },
   darkText: {
     color: '#000000',
   },
+
+  // STATS GRID - White cards
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 30,
+    marginBottom: spacing.xl,
+    backgroundColor: 'transparent',
   },
   statCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffff',
     width: '48%',
-    padding: 20,
-    borderRadius: 15,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: spacing.md,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
+  statNumber: {
+    color: '#febe10',
+  },
+  statLabel: {
+    color: '#000000',
+  },
+
+  // SETTINGS SECTION
   settingsSection: {
-    marginBottom: 30,
+    marginBottom: spacing.xl,
+    backgroundColor: 'transparent',
   },
   sectionTitle: {
-    marginBottom: 15,
+    marginBottom: spacing.md,
+    color: '#ffffff',
   },
   settingCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 15,
-    marginBottom: 15,
+    backgroundColor: '#ffffff',
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   settingRow: {
     flexDirection: 'row',
@@ -430,75 +539,119 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   settingDetail: {
-    color: '#666666',
-    fontSize: 14,
-    marginTop: 5,
+    color: '#000000',
+    fontSize: typography.sizes.sm,
+    marginTop: spacing.xs,
+    opacity: 0.7,
   },
+  editTimesButton: {
+    backgroundColor: '#40ae49',
+    padding: spacing.sm,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  editTimesButtonText: {
+    color: '#ffffff',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+  },
+  testButton: {
+    backgroundColor: '#88c78d',
+    padding: spacing.md,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  testButtonText: {
+    color: '#ffffff',
+    fontSize: typography.sizes.md,
+  },
+
+  // WELLBEING SECTION
   wellbeingSection: {
-    marginBottom: 30,
+    marginBottom: spacing.xl,
+    backgroundColor: 'transparent',
   },
   wellbeingCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 15,
+    backgroundColor: '#ffffff',
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  emotionalState: {
+    fontSize: typography.sizes.lg,
+    marginTop: spacing.xs,
+  },
+  wellbeingLevel: {
+    fontSize: typography.sizes.md,
+    marginTop: spacing.xs,
+    fontWeight: typography.weights.semibold,
+  },
+
+  // ACTION BUTTONS
+  recalculateButton: {
+    backgroundColor: '#88c78d',
+    padding: spacing.md,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    marginBottom: spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
   },
-  emotionalState: {
-    fontSize: 18,
-    marginTop: 5,
-  },
-  wellbeingLevel: {
-    fontSize: 16,
-    marginTop: 5,
-    fontWeight: '600',
+  recalculateButtonText: {
+    color: '#ffffff',
+    fontSize: typography.sizes.md,
   },
   deleteButton: {
-    backgroundColor: '#FF4444',
-    padding: 15,
-    borderRadius: 25,
+    backgroundColor: colors.ui.error,
+    padding: spacing.md,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: spacing.md,
     opacity: 0.9,
   },
   deleteButtonText: {
-    color: 'white',
-    fontSize: 14,
+    color: '#ffffff',
+    fontSize: typography.sizes.sm,
   },
   editButton: {
-    backgroundColor: '#58CC02',
-    padding: 15,
-    borderRadius: 25,
+    backgroundColor: '#40ae49',
+    padding: spacing.md,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   editButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#ffffff',
+    fontSize: typography.sizes.md,
   },
   shareButton: {
-    backgroundColor: '#FF6B6B',
-    padding: 15,
-    borderRadius: 25,
+    backgroundColor: '#febe10',
+    padding: spacing.md,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   shareButtonText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  setupButton: {
-    backgroundColor: '#58CC02',
-    padding: 15,
-    borderRadius: 25,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  setupButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#000000',
+    fontSize: typography.sizes.md,
   },
 });

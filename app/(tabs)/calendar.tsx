@@ -15,7 +15,7 @@ import {
 } from '@/src/utils/storage';
 import moment from 'moment';
 import React, { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -212,6 +212,23 @@ export default function CalendarScreen() {
         >
           <ThemedView style={styles.content}>
 
+            {/* Month Header with Sun Logos */}
+            <View style={styles.monthHeaderWithLogos}>
+              <Image
+                source={require('@/assets/images/C91E96D5-6719-4F09-8523-2BAB1D53B09FKind_Sun.jpeg')}
+                style={styles.sunLogo}
+                resizeMode="contain"
+              />
+              <ThemedText type="title" style={styles.monthTitle}>
+                {moment(selectedDate).format('MMMM YYYY')}
+              </ThemedText>
+              <Image
+                source={require('@/assets/images/C91E96D5-6719-4F09-8523-2BAB1D53B09FKind_Sun.jpeg')}
+                style={styles.sunLogo}
+                resizeMode="contain"
+              />
+            </View>
+
             {/* Calendar */}
             <ThemedView style={styles.calendarContainer}>
               <Calendar
@@ -377,7 +394,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   content: {
     padding: spacing.md,
@@ -388,6 +405,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',
+  },
+
+  monthHeaderWithLogos: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+    gap: 15,
+  },
+  sunLogo: {
+    width: 40,
+    height: 40,
+  },
+  monthTitle: {
+    color: '#ffffff',
   },
 
   calendarContainer: {

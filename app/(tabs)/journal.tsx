@@ -13,6 +13,7 @@ import moment from 'moment';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -31,7 +32,6 @@ export default function JournalScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
 
-  // Form state
   const [newEntryTitle, setNewEntryTitle] = useState('');
   const [newEntryContent, setNewEntryContent] = useState('');
   const [selectedKindnessAct, setSelectedKindnessAct] = useState<string | null>(null);
@@ -41,8 +41,6 @@ export default function JournalScreen() {
   const moods = [
     { value: 'happy', label: 'Happy', icon: '😊' },
     { value: 'grateful', label: 'Grateful', icon: '🙏' },
-    { value: 'calm', label: 'Calm', icon: '😌' },
-    { value: 'excited', label: 'Excited', icon: '🤗' },
     { value: 'neutral', label: 'Neutral', icon: '😐' },
     { value: 'anxious', label: 'Anxious', icon: '😰' },
     { value: 'sad', label: 'Sad', icon: '😢' },
@@ -113,7 +111,6 @@ export default function JournalScreen() {
       await saveJournalEntry(entryData);
       await loadData();
 
-      // Reset form
       setNewEntryTitle('');
       setNewEntryContent('');
       setSelectedKindnessAct(null);
@@ -197,12 +194,24 @@ export default function JournalScreen() {
           <ThemedView style={styles.content}>
 
             {/* Header */}
-            <ThemedView style={styles.header}>
-              <ThemedText type="title">My Journal</ThemedText>
-              <ThemedText style={styles.subtitle}>
-                Reflect on your kindness journey
-              </ThemedText>
-            </ThemedView>
+            <View style={styles.headerWithLogos}>
+              <Image
+                source={require('@/assets/images/C91E96D5-6719-4F09-8523-2BAB1D53B09FKind_Sun.jpeg')}
+                style={styles.sunLogo}
+                resizeMode="contain"
+              />
+              <ThemedView style={styles.header}>
+                <ThemedText type="title">My Journal</ThemedText>
+                <ThemedText style={styles.subtitle}>
+                  Reflect on your kindness journey
+                </ThemedText>
+              </ThemedView>
+              <Image
+                source={require('@/assets/images/C91E96D5-6719-4F09-8523-2BAB1D53B09FKind_Sun.jpeg')}
+                style={styles.sunLogo}
+                resizeMode="contain"
+              />
+            </View>
 
             {/* Add Entry Button */}
             <TouchableOpacity style={styles.addButton} onPress={startNewEntry}>
@@ -256,23 +265,27 @@ export default function JournalScreen() {
                     >
                       <ThemedText style={styles.kindnessActText}>None</ThemedText>
                     </TouchableOpacity>
-                    {kindnessActs.slice(0, 10).map((act) => (
-                      <TouchableOpacity
-                        key={act.id}
-                        style={[
-                          styles.kindnessActOption,
-                          selectedKindnessAct === act.id && styles.kindnessActSelected
-                        ]}
-                        onPress={() => setSelectedKindnessAct(act.id)}
-                      >
-                        <ThemedText style={styles.kindnessActText} numberOfLines={2}>
-                          {act.title}
-                        </ThemedText>
-                        <ThemedText style={styles.kindnessActDate}>
-                          {moment(act.date).format('MMM D')}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    ))}
+                    {kindnessActs
+                      .filter(act => user && act.user_id === user.id)
+                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                      .slice(0, 10)
+                      .map((act) => (
+                        <TouchableOpacity
+                          key={act.id}
+                          style={[
+                            styles.kindnessActOption,
+                            selectedKindnessAct === act.id && styles.kindnessActSelected
+                          ]}
+                          onPress={() => setSelectedKindnessAct(act.id)}
+                        >
+                          <ThemedText style={styles.kindnessActText} numberOfLines={2}>
+                            {act.title}
+                          </ThemedText>
+                          <ThemedText style={styles.kindnessActDate}>
+                            {moment(act.date).format('MMM D')}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      ))}
                   </ScrollView>
                 </View>
 
@@ -413,7 +426,6 @@ export default function JournalScreen() {
 }
 
 const styles = StyleSheet.create({
-  // MAIN BACKGROUND - Primary Green
   safeArea: {
     flex: 1,
     backgroundColor: '#40ae49',
@@ -424,7 +436,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   content: {
     padding: spacing.md,
@@ -437,9 +449,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 
-  // HEADER - White text on green
-  header: {
+  headerWithLogos: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.md,
+    gap: 15,
+  },
+  sunLogo: {
+    width: 50,
+    height: 50,
+  },
+  header: {
     alignItems: 'center',
     backgroundColor: 'transparent',
   },
@@ -449,7 +470,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
 
-  // ADD BUTTON - Primary Yellow
   addButton: {
     backgroundColor: '#febe10',
     padding: spacing.md,
@@ -468,7 +488,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // ADD FORM - White card
   addForm: {
     backgroundColor: '#ffffff',
     padding: spacing.md,
@@ -508,7 +527,6 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
 
-  // KINDNESS ACTS SCROLL
   kindnessActsScroll: {
     marginTop: spacing.xs,
   },
@@ -537,7 +555,6 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 
-  // MOODS SECTION
   moodsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -553,30 +570,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   moodOption: {
-    width: '23%',
+    width: '31%',
     backgroundColor: '#f2f2f2',
-    padding: spacing.sm,
-    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
     marginBottom: spacing.sm,
     borderWidth: 2,
     borderColor: '#d4dcc4',
+    minHeight: 80,
+    justifyContent: 'center',
   },
   moodSelected: {
     borderColor: '#40ae49',
     backgroundColor: '#88c78d',
   },
   moodIcon: {
-    fontSize: 16,
-    marginBottom: 2,
+    fontSize: 24,
+    marginBottom: 6,
   },
   moodLabel: {
-    fontSize: 8,
+    fontSize: 11,
     textAlign: 'center',
     color: '#000000',
+    fontWeight: '500',
   },
 
-  // FORM BUTTONS
   formButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -606,7 +625,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
   },
 
-  // ENTRIES SECTION
   entriesSection: {
     marginTop: spacing.md,
     backgroundColor: 'transparent',
@@ -674,7 +692,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
-  // LINKED ACT CARD
   linkedActCard: {
     backgroundColor: '#fcebb4',
     padding: spacing.sm,
@@ -692,7 +709,6 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 
-  // MOOD INDICATORS
   moodIndicators: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -718,7 +734,6 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 
-  // EMPTY STATE - White text on green
   emptyState: {
     alignItems: 'center',
     padding: spacing.xl,
@@ -727,6 +742,7 @@ const styles = StyleSheet.create({
   emptyIcon: {
     fontSize: 48,
     marginBottom: spacing.md,
+    lineHeight: 56,
   },
   emptyText: {
     fontSize: typography.sizes.lg,

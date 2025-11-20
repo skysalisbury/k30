@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import React from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface WelcomeScreenProps {
@@ -18,14 +18,16 @@ export default function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
       >
         <ThemedView style={styles.content}>
           <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <ThemedText style={styles.logoText}>💝</ThemedText>
-            </View>
+            <Image
+              source={require('@/assets/images/Kind_30_Logo_Horizontal.jpeg')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.textContent}>
             <ThemedText type="title" style={styles.title}>
-              Welcome to Kindness Reminder
+              Welcome to Kind30
             </ThemedText>
 
             <ThemedText type="subtitle" style={styles.subtitle}>
@@ -82,6 +84,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
+    paddingBottom: 100,
   },
   content: {
     flex: 1,
@@ -95,16 +98,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   logo: {
-    width: 100,
+    width: '80%',
     height: 100,
-    borderRadius: 50,
-    backgroundColor: '#febe10',
-    justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: 20,
-  },
-  logoText: {
-    fontSize: 50,
   },
   textContent: {
     alignItems: 'center',

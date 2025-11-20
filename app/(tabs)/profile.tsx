@@ -20,7 +20,7 @@ import {
   saveNotificationSettings
 } from '@/src/utils/storage';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, TouchableOpacity } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ProfileScreen() {
@@ -106,7 +106,6 @@ export default function ProfileScreen() {
           return;
         }
 
-        // Save settings FIRST before scheduling
         const updatedSettings: NotificationSettings = {
           ...notifications,
           enabled: true,
@@ -115,7 +114,6 @@ export default function ProfileScreen() {
         await saveNotificationSettings(updatedSettings);
         console.log('Settings saved:', updatedSettings);
 
-        // Then schedule with the updated settings
         await scheduleDailyReminders();
 
         Alert.alert(
@@ -251,9 +249,24 @@ export default function ProfileScreen() {
                 {(profile?.first_name?.[0] || user?.name?.[0] || 'K').toUpperCase()}
               </ThemedText>
             </ThemedView>
-            <ThemedText type="title" style={styles.headerTitle}>
-              {profile?.first_name} {profile?.last_name}
-            </ThemedText>
+
+            {/* User Name with Sun Logos */}
+            <View style={styles.nameWithLogos}>
+              <Image
+                source={require('@/assets/images/C91E96D5-6719-4F09-8523-2BAB1D53B09FKind_Sun.jpeg')}
+                style={styles.sunLogo}
+                resizeMode="contain"
+              />
+              <ThemedText type="title" style={styles.headerTitle}>
+                {profile?.first_name} {profile?.last_name}
+              </ThemedText>
+              <Image
+                source={require('@/assets/images/C91E96D5-6719-4F09-8523-2BAB1D53B09FKind_Sun.jpeg')}
+                style={styles.sunLogo}
+                resizeMode="contain"
+              />
+            </View>
+
             <ThemedText type="subtitle" style={styles.headerSubtitle}>
               {profile?.location_city || 'Kindness Warrior'}
             </ThemedText>
@@ -424,7 +437,6 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  // MAIN BACKGROUND - Primary Green
   safeArea: {
     flex: 1,
     backgroundColor: '#40ae49',
@@ -435,7 +447,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   content: {
     padding: spacing.md,
@@ -445,7 +457,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
 
-  // PROFILE HEADER - White text on green
   profileHeader: {
     alignItems: 'center',
     marginBottom: spacing.xl,
@@ -465,6 +476,17 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: '#000000',
   },
+  nameWithLogos: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 15,
+    marginBottom: spacing.xs,
+  },
+  sunLogo: {
+    width: 40,
+    height: 40,
+  },
   headerTitle: {
     color: '#ffffff',
   },
@@ -480,7 +502,6 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 
-  // STATS GRID - White cards
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -508,7 +529,6 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 
-  // SETTINGS SECTION
   settingsSection: {
     marginBottom: spacing.xl,
     backgroundColor: 'transparent',
@@ -568,7 +588,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
   },
 
-  // WELLBEING SECTION
   wellbeingSection: {
     marginBottom: spacing.xl,
     backgroundColor: 'transparent',
@@ -593,7 +612,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
   },
 
-  // ACTION BUTTONS
   recalculateButton: {
     backgroundColor: '#88c78d',
     padding: spacing.md,

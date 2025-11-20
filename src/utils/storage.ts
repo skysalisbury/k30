@@ -74,15 +74,24 @@ export const recalculateStreak = async (): Promise<void> => {
     const user = await getUser();
     if (!user) {
       console.log('No user found');
-      throw new Error('No user found');
+      return; // Just return, don't throw error
     }
 
     const acts = await getKindnessActs();
     const datesWithActs = [...new Set(acts.map(act => act.date))].sort();
 
+    // If no acts, initialize streak with zeros - this is normal for new users
     if (datesWithActs.length === 0) {
-      console.log('No acts found');
-      throw new Error('No kindness acts found');
+      console.log('No acts found - initializing empty streak for new user');
+      const emptyStreak: UserStreak = {
+        user_id: user.id,
+        current_streak_days: 0,
+        longest_streak_days: 0,
+        last_activity_date: moment().format('YYYY-MM-DD'),
+        total_days_active: 0,
+      };
+      await saveUserStreak(emptyStreak);
+      return;
     }
 
     console.log('Dates with acts:', datesWithActs);
@@ -142,7 +151,7 @@ export const recalculateStreak = async (): Promise<void> => {
     console.log('Streak recalculated successfully:', updatedStreak);
   } catch (error) {
     console.error('Error recalculating streak:', error);
-    throw error;
+    // Don't throw - just log the error so app can continue
   }
 };
 

@@ -1,9 +1,10 @@
+import { getUser } from '@/src/utils/storage';
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 
-// FORCE LIGHT MODE - No more dark mode!
 const LightTheme = {
   ...DefaultTheme,
   colors: {
@@ -20,14 +21,43 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  const [userExists, setUserExists] = useState<boolean | null>(null);
+  const router = useRouter();
+  const segments = useSegments();
 
-  if (!loaded) {
+  useEffect(() => {
+    checkUser();
+  }, []);
+
+  const checkUser = async () => {
+    try {
+      const user = await getUser();
+      setUserExists(!!user);
+    } catch (error) {
+      setUserExists(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userExists === null || !loaded) return;
+
+    const inWelcome = segments[0] === 'welcome';
+
+    if (!userExists && !inWelcome) {
+      router.replace('/welcome');
+    } else if (userExists && inWelcome) {
+      router.replace('/(tabs)');
+    }
+  }, [userExists, segments, loaded]);
+
+  if (!loaded || userExists === null) {
     return null;
   }
 
   return (
     <ThemeProvider value={LightTheme}>
       <Stack>
+        <Stack.Screen name="welcome" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>

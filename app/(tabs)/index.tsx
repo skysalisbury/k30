@@ -13,7 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import moment from 'moment';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
@@ -133,6 +133,15 @@ export default function HomeScreen() {
       >
         <ThemedView style={styles.content}>
 
+          {/* Kind30 Logo at Top */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('@/assets/images/Kind_30_Logo_Horizontal.jpeg')}
+              style={styles.horizontalLogo}
+              resizeMode="contain"
+            />
+          </View>
+
           {/* Welcome Header */}
           <ThemedView style={styles.header}>
             <ThemedText type="title" style={styles.headerTitle}>
@@ -208,6 +217,15 @@ export default function HomeScreen() {
                 </ThemedView>
               )}
 
+              {/* KIND30 Challenge Explanation */}
+              {challenge.current_day <= 30 && (
+                <ThemedView style={styles.challengeExplanation}>
+                  <ThemedText style={styles.explanationText}>
+                    Why 30 days? It takes 30 days to build a habit. And who wouldn't want a world that's habitually kind?
+                  </ThemedText>
+                </ThemedView>
+              )}
+
               {/* Action Buttons */}
               {challenge.current_day <= 30 && (
                 <View style={styles.actionButtons}>
@@ -274,11 +292,23 @@ export default function HomeScreen() {
             </ThemedView>
           </View>
 
-          {/* Quick Actions */}
+          {/* Quick Actions with Sun Logos */}
           <ThemedView style={styles.quickActions}>
-            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-              Quick Actions
-            </ThemedText>
+            <View style={styles.quickActionsHeader}>
+              <Image
+                source={require('@/assets/images/C91E96D5-6719-4F09-8523-2BAB1D53B09FKind_Sun.jpeg')}
+                style={styles.sunLogo}
+                resizeMode="contain"
+              />
+              <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+                Quick Actions
+              </ThemedText>
+              <Image
+                source={require('@/assets/images/C91E96D5-6719-4F09-8523-2BAB1D53B09FKind_Sun.jpeg')}
+                style={styles.sunLogo}
+                resizeMode="contain"
+              />
+            </View>
 
             <TouchableOpacity style={styles.quickActionButton} onPress={navigateToCalendar}>
               <View style={styles.quickActionContent}>
@@ -325,7 +355,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 100,
     backgroundColor: 'transparent',
   },
   centerContent: {
@@ -337,6 +367,15 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#ffffff',
   },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingTop: 10,
+  },
+  horizontalLogo: {
+    width: '80%',
+    height: 60,
+  },
   header: {
     marginBottom: 20,
     alignItems: 'center',
@@ -344,6 +383,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: '#ffffff',
+    textAlign: 'center',
   },
   subtitle: {
     opacity: 0.9,
@@ -465,6 +505,20 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     color: '#000000',
   },
+  challengeExplanation: {
+    backgroundColor: '#fcebb4',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    borderLeftWidth: 3,
+    borderLeftColor: '#febe10',
+  },
+  explanationText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#000000',
+    textAlign: 'left',
+  },
   actionButtons: {
     gap: 10,
   },
@@ -562,8 +616,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     backgroundColor: 'transparent',
   },
-  sectionTitle: {
+  quickActionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 15,
+    gap: 15,
+  },
+  sunLogo: {
+    width: 40,
+    height: 40,
+  },
+  sectionTitle: {
     color: '#ffffff',
   },
   quickActionButton: {

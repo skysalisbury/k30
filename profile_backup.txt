@@ -12,7 +12,6 @@ import {
 } from '@/src/utils/notificationService';
 import {
   clearAllData,
-  getKindnessActs,
   getNotificationSettings,
   getUser,
   getUserProfile,
@@ -20,14 +19,11 @@ import {
   recalculateStreak,
   saveNotificationSettings
 } from '@/src/utils/storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ProfileScreen() {
-  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [streak, setStreak] = useState<UserStreak | null>(null);
@@ -72,46 +68,6 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleClearTestActs = async () => {
-    Alert.alert(
-      'Clear Test Acts',
-      'This will delete acts with titles like "Fuck you", "A", etc. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const allActs = await getKindnessActs();
-              const testTitles = ['fuck you', 'a', 'test', 'asdf', 'aa', 'aaa'];
-
-              const cleanedActs = allActs.filter(act => {
-                const title = act.title.toLowerCase().trim();
-                return !testTitles.includes(title) && title.length > 2;
-              });
-
-              await AsyncStorage.setItem('kindness_acts', JSON.stringify(cleanedActs));
-
-              const removedCount = allActs.length - cleanedActs.length;
-
-              Alert.alert(
-                'Success!',
-                `Removed ${removedCount} test act${removedCount !== 1 ? 's' : ''}.`
-              );
-
-              await recalculateStreak();
-              await loadProfileData();
-            } catch (error) {
-              console.error('Error clearing test acts:', error);
-              Alert.alert('Error', 'Failed to clear test acts');
-            }
-          }
-        }
-      ]
-    );
   };
 
   const handleRecalculateStreak = async () => {
@@ -230,26 +186,12 @@ export default function ProfileScreen() {
 
   const handleDeleteProfile = async () => {
     try {
-      console.log('🗑️ Starting profile deletion...');
-
-      // Clear all data
       await clearAllData();
-      console.log('✅ clearAllData() completed');
-
-      // Extra safeguard: manually clear kindness acts
-      await AsyncStorage.setItem('kindness_acts', JSON.stringify([]));
-      console.log('✅ Manually cleared kindness_acts');
-
-      // Clear state
       setUser(null);
       setProfile(null);
       setStreak(null);
       setNotifications(null);
-
-      console.log('✅ Profile deleted, navigating to welcome...');
-
-      // Immediately navigate to welcome screen
-      router.replace('/welcome');
+      loadProfileData();
     } catch (error) {
       console.error('Error clearing data:', error);
     }
@@ -470,12 +412,6 @@ export default function ProfileScreen() {
             </ThemedText>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.clearTestButton} onPress={handleClearTestActs}>
-            <ThemedText type="defaultSemiBold" style={styles.clearTestButtonText}>
-              🧹 Clear Test Acts
-            </ThemedText>
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteProfile}>
             <ThemedText type="defaultSemiBold" style={styles.deleteButtonText}>
               Delete Profile (Testing)
@@ -690,22 +626,6 @@ const styles = StyleSheet.create({
   },
   recalculateButtonText: {
     color: '#ffffff',
-    fontSize: typography.sizes.md,
-  },
-  clearTestButton: {
-    backgroundColor: '#febe10',
-    padding: spacing.md,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  clearTestButtonText: {
-    color: '#000000',
     fontSize: typography.sizes.md,
   },
   deleteButton: {

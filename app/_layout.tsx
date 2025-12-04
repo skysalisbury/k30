@@ -29,6 +29,11 @@ export default function RootLayout() {
     checkUser();
   }, []);
 
+  // Re-check user whenever segments change (route changes)
+  useEffect(() => {
+    checkUser();
+  }, [segments]);
+
   const checkUser = async () => {
     try {
       const user = await getUser();

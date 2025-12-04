@@ -9,6 +9,8 @@ import {
   getUser,
   saveJournalEntry
 } from '@/src/utils/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import moment from 'moment';
 import React, { useEffect, useState } from 'react';
 import {
@@ -25,6 +27,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function JournalScreen() {
+  const navigation = useNavigation();
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [kindnessActs, setKindnessActs] = useState<KindnessAct[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -51,6 +54,87 @@ export default function JournalScreen() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('Journal screen focused - cleaning up orphaned acts');
+      cleanupOrphanedActs();
+      loadData();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const cleanupOrphanedActs = async () => {
+    try {
+      const currentUser = await getUser();
+      const allActs = await getKindnessActs();
+
+      if (!currentUser) {
+        // No user exists, clear ALL acts
+        console.log('No user found, clearing all acts');
+        await AsyncStorage.setItem('kindness_acts', JSON.stringify([]));
+        return;
+      }
+
+      console.log('Current user:', currentUser.id, 'Created:', currentUser.created_at);
+
+      // Remove acts that don't belong to current user OR were created before current user
+      const currentUserActs = allActs.filter(act => {
+        const belongsToUser = act.user_id === currentUser.id;
+        const actCreated = new Date(act.created_at).getTime();
+        const userCreated = new Date(currentUser.created_at).getTime();
+        const isNewer = actCreated >= userCreated;
+
+        console.log(`Act "${act.title}": user_id match=${belongsToUser}, created after user=${isNewer}`);
+
+        return belongsToUser && isNewer;
+      });
+
+      if (allActs.length !== currentUserActs.length) {
+        await AsyncStorage.setItem('kindness_acts', JSON.stringify(currentUserActs));
+        console.log(`✅ Removed ${allActs.length - currentUserActs.length} orphaned acts from deleted users`);
+        await loadData(); // Reload after cleanup
+      }
+    } catch (error) {
+      console.error('Error cleaning orphaned acts:', error);
+    }
+  };
+
+  const cleanupOldActs = async () => {
+    try {
+      const currentUser = await getUser();
+      if (!currentUser) {
+        console.log('No current user, skipping cleanup');
+        return;
+      }
+
+      const allActs = await getKindnessActs();
+      console.log('Total acts before cleanup:', allActs.length);
+      console.log('Current user ID:', currentUser.id);
+
+      const currentUserActs = allActs.filter(act => {
+        // If act has no user_id, it's from an old profile - remove it
+        if (!act.user_id) {
+          console.log('Act has no user_id, removing:', act.title);
+          return false;
+        }
+        const match = act.user_id === currentUser.id;
+        console.log('Act:', act.title, 'user_id:', act.user_id, 'Match:', match);
+        return match;
+      });
+
+      console.log('Acts after filtering:', currentUserActs.length);
+
+      // Always save the filtered list to ensure cleanup
+      await AsyncStorage.setItem('kindness_acts', JSON.stringify(currentUserActs));
+      console.log(`Cleaned up ${allActs.length - currentUserActs.length} acts from old users`);
+
+      // Reload the data to update the UI
+      await loadData();
+    } catch (error) {
+      console.error('Error cleaning up old acts:', error);
+    }
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -69,7 +153,8 @@ export default function JournalScreen() {
     }
   };
 
-  const startNewEntry = () => {
+  const startNewEntry = async () => {
+    await cleanupOldActs(); // Clean up old acts before opening form
     setEditingEntry(null);
     setNewEntryTitle('');
     setNewEntryContent('');
@@ -570,27 +655,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   moodOption: {
-    width: '31%',
+    width: '48%',
     backgroundColor: '#f2f2f2',
-    padding: spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: borderRadius.md,
     alignItems: 'center',
     marginBottom: spacing.sm,
     borderWidth: 2,
     borderColor: '#d4dcc4',
-    minHeight: 80,
+    minHeight: 75,
     justifyContent: 'center',
+    flexDirection: 'column',
+    overflow: 'visible',
   },
   moodSelected: {
     borderColor: '#40ae49',
     backgroundColor: '#88c78d',
   },
   moodIcon: {
-    fontSize: 24,
-    marginBottom: 6,
+    fontSize: 28,
+    marginBottom: 4,
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   moodLabel: {
-    fontSize: 11,
+    fontSize: 13,
     textAlign: 'center',
     color: '#000000',
     fontWeight: '500',

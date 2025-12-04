@@ -8,6 +8,7 @@ import {
   getTodaysKindnessActs,
   getUser,
   getUserStreak,
+  markChallengeDay,
   saveChallengeProgress,
   saveKindnessAct,
   saveUserStreak
@@ -142,80 +143,30 @@ export default function CalendarScreen() {
 
         const challenge = await getChallengeProgress();
         if (challenge && challenge.is_active) {
-          console.log('📊 Challenge check - Current state:', {
-            completedDays: challenge.completed_days,
-            lastUpdated: challenge.last_updated
-          });
+          const yesterday = moment().subtract(1, 'days').format('YYYY-MM-DD');
+          const lastCompletedDay = challenge.completed_days.length > 0
+            ? Math.max(...challenge.completed_days)
+            : 0;
 
-          // Get all dates that have acts
           const allActs = await getKindnessActs();
-          const datesWithActs = [...new Set(allActs.map(act => act.date))].sort();
+          const yesterdayActs = allActs.filter(act => act.date === yesterday);
+          const hasYesterdayAct = yesterdayActs.length > 0;
 
-          console.log('📅 Dates with acts:', datesWithActs);
+          const isConsecutive = lastCompletedDay === 0 || hasYesterdayAct;
 
-          // Calculate days since challenge started
-          const startDate = moment(challenge.start_date);
-          const today = moment();
-
-          console.log('🏁 Challenge started:', challenge.start_date);
-
-          // Check if user has been consecutive from start OR from last break
-          let consecutiveDays = 0;
-          let lastBreakDate = moment(challenge.start_date);
-
-          // Find the most recent streak (going backwards from today)
-          let checkDate = moment(today);
-          let streakDates = [];
-
-          while (checkDate.isSameOrAfter(startDate, 'day')) {
-            const dateStr = checkDate.format('YYYY-MM-DD');
-            const hasAct = datesWithActs.includes(dateStr);
-
-            if (hasAct) {
-              streakDates.unshift(dateStr); // Add to beginning
-            } else if (streakDates.length > 0) {
-              // Hit a gap and we already have a streak - stop here
-              break;
+          if (isConsecutive) {
+            const nextDay = lastCompletedDay + 1;
+            if (nextDay <= 30 && !challenge.completed_days.includes(nextDay)) {
+              await markChallengeDay(nextDay);
+              console.log(`Challenge day ${nextDay} marked complete (consecutive)`);
             }
-
-            checkDate.subtract(1, 'day');
-          }
-
-          consecutiveDays = streakDates.length;
-          console.log(`🎯 Current consecutive streak: ${consecutiveDays} days`);
-          console.log(`📅 Streak dates:`, streakDates);
-
-          // Update challenge based on consecutive count
-          if (consecutiveDays === 0) {
-            // No current streak - set to day 0
-            console.log('🔄 No active streak - setting to Day 0');
-            const updatedChallenge = {
-              ...challenge,
-              completed_days: [],
-              current_day: 0,
-              last_updated: new Date().toISOString(),
-            };
-            await saveChallengeProgress(updatedChallenge);
           } else {
-            // Mark days 1 through consecutiveDays as complete
-            const newCompletedDays = Array.from({ length: consecutiveDays }, (_, i) => i + 1);
-
-            console.log('✅ Marking days complete:', newCompletedDays);
-
-            const updatedChallenge = {
-              ...challenge,
-              completed_days: newCompletedDays,
-              current_day: consecutiveDays,
-              last_updated: new Date().toISOString(),
-            };
-
-            if (consecutiveDays >= 30) {
-              updatedChallenge.is_active = false;
-              updatedChallenge.completed_at = new Date().toISOString();
-              console.log('🎉 Challenge completed!');
-            }
-
-            await saveChallengeProgress(updatedChallenge);
+            console.log('Missed a day - resetting challenge');
+            challenge.completed_days = [1];
+            challenge.current_day = 1;
+            challenge.last_updated = new Date().toISOString();
+            await saveChallengeProgress(challenge);
+            console.log('Challenge reset to day 1 due to gap');
           }
         }
       }

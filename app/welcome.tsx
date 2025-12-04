@@ -10,7 +10,11 @@ export default function Welcome() {
     setShowSetup(true);
   };
 
-  const handleSetupComplete = () => {
+  const handleSetupComplete = async () => {
+    // Small delay to ensure storage operations complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Navigate to tabs - _layout.tsx will detect user exists
     router.replace('/(tabs)');
   };
 

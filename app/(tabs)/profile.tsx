@@ -18,12 +18,14 @@ import {
   getUserProfile,
   getUserStreak,
   recalculateStreak,
-  saveNotificationSettings
+  saveNotificationSettings,
+  saveUserProfile
 } from '@/src/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { ActionSheetIOS, Alert, Image, Platform, ScrollView, Share, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ProfileScreen() {
@@ -71,6 +73,104 @@ export default function ProfileScreen() {
       console.error('Error loading profile data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAvatarPress = async () => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Take Photo', 'Choose from Library'],
+          cancelButtonIndex: 0,
+        },
+        async (buttonIndex) => {
+          if (buttonIndex === 1) {
+            await pickImage(true);
+          } else if (buttonIndex === 2) {
+            await pickImage(false);
+          }
+        }
+      );
+    } else {
+      // Android
+      Alert.alert(
+        'Change Profile Picture',
+        'Choose an option',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Take Photo', onPress: () => pickImage(true) },
+          { text: 'Choose from Library', onPress: () => pickImage(false) },
+        ]
+      );
+    }
+  };
+
+  const pickImage = async (useCamera: boolean) => {
+    try {
+      // Request permissions
+      const permissionResult = useCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        Alert.alert(
+          'Permission Required',
+          `Please enable ${useCamera ? 'camera' : 'photo library'} access in your device settings.`
+        );
+        return;
+      }
+
+      // Launch picker
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        })
+        : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+
+      if (!result.canceled && result.assets[0] && profile) {
+        const imageUri = result.assets[0].uri;
+
+        // Update profile with new avatar
+        const updatedProfile = {
+          ...profile,
+          avatar_uri: imageUri,
+          updated_at: new Date().toISOString(),
+        };
+
+        await saveUserProfile(updatedProfile);
+        setProfile(updatedProfile);
+
+        Alert.alert('Success!', 'Profile picture updated.');
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to update profile picture.');
+    }
+  };
+
+  const handleShareApp = async () => {
+    try {
+      const message = 'Join me in Kind30! Download: https://kind30.app';
+
+      // Use native Share API (works on both iOS and Android)
+      const result = await Share.share({
+        message: message,
+        title: 'Join Kind30',
+      });
+
+      if (result.action === Share.sharedAction) {
+        console.log('App shared successfully');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      Alert.alert('Error', 'Failed to share app.');
     }
   };
 
@@ -302,11 +402,23 @@ export default function ProfileScreen() {
         <ThemedView style={styles.content}>
 
           <ThemedView style={styles.profileHeader}>
-            <ThemedView style={styles.avatar}>
-              <ThemedText style={styles.avatarText}>
-                {(profile?.first_name?.[0] || user?.name?.[0] || 'K').toUpperCase()}
-              </ThemedText>
-            </ThemedView>
+            <TouchableOpacity onPress={handleAvatarPress} style={styles.avatarContainer}>
+              {profile?.avatar_uri ? (
+                <Image
+                  source={{ uri: profile.avatar_uri }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <ThemedView style={styles.avatar}>
+                  <ThemedText style={styles.avatarText}>
+                    {(profile?.first_name?.[0] || user?.name?.[0] || 'K').toUpperCase()}
+                  </ThemedText>
+                </ThemedView>
+              )}
+              <View style={styles.editIconContainer}>
+                <ThemedText style={styles.plusIcon}>+</ThemedText>
+              </View>
+            </TouchableOpacity>
 
             {/* User Name with Sun Logos */}
             <View style={styles.nameWithLogos}>
@@ -488,7 +600,7 @@ export default function ProfileScreen() {
             </ThemedText>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.shareButton}>
+          <TouchableOpacity style={styles.shareButton} onPress={handleShareApp}>
             <ThemedText type="defaultSemiBold" style={styles.shareButtonText}>
               Invite Friends
             </ThemedText>
@@ -526,6 +638,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     backgroundColor: 'transparent',
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: spacing.md,
+  },
   avatar: {
     width: 80,
     height: 80,
@@ -533,12 +649,49 @@ const styles = StyleSheet.create({
     backgroundColor: '#febe10',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   avatarText: {
     fontSize: 36,
     fontWeight: typography.weights.bold,
     color: '#000000',
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#40ae49',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraIcon: {
+    fontSize: 14,
+  },
+  editIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#40ae49',
+  },
+  plusIcon: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000000',
+    lineHeight: 22,
   },
   nameWithLogos: {
     flexDirection: 'row',

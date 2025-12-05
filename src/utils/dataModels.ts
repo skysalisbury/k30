@@ -11,6 +11,7 @@ export interface UserProfile {
   first_name: string;
   last_name: string;
   location_city?: string;
+  avatar_uri?: string; // Local file URI for profile picture
   emotional_state: 'happy' | 'neutral' | 'sad' | 'anxious' | 'stressed' | 'excited' | 'peaceful';
   mental_wellbeing: 'excellent' | 'good' | 'fair' | 'struggling' | 'need_support';
   updated_at: string;
@@ -63,18 +64,7 @@ export interface ChallengeProgress {
   user_id: string;
   challenge_name: 'KIND30';
   start_date: string; // ISO date when user started the challenge
-  current_day: number; // 1-30
-  completed_days: number[]; // array of completed day numbers
-  is_active: boolean;
-  completed_at?: string; // ISO date when they finished all 30 days
-  last_updated: string;
-}
-
-export interface ChallengeProgress {
-  user_id: string;
-  challenge_name: 'KIND30';
-  start_date: string; // ISO date when user started the challenge
-  current_day: number; // 1-30
+  current_day: number; // 0-30 (0 = not started yet)
   completed_days: number[]; // array of completed day numbers
   is_active: boolean;
   completed_at?: string; // ISO date when they finished all 30 days

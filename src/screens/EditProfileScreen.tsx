@@ -15,7 +15,7 @@ export default function EditProfileScreen({ onComplete }: EditProfileScreenProps
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('');
-  const [emotionalState, setEmotionalState] = useState<'happy' | 'neutral' | 'sad' | 'anxious' | 'stressed' | 'excited' | 'peaceful'>('happy');
+  const [emotionalState, setEmotionalState] = useState<'happy' | 'neutral' | 'sad' | 'anxious' | 'excited' | 'peaceful'>('happy');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -27,7 +27,6 @@ export default function EditProfileScreen({ onComplete }: EditProfileScreenProps
     { value: 'peaceful', label: 'Peaceful', icon: '😌' },
     { value: 'neutral', label: 'Neutral', icon: '😐' },
     { value: 'anxious', label: 'Anxious', icon: '😰' },
-    { value: 'stressed', label: 'Stressed', icon: '😤' },
     { value: 'sad', label: 'Sad', icon: '😢' },
   ] as const;
 
@@ -47,7 +46,9 @@ export default function EditProfileScreen({ onComplete }: EditProfileScreenProps
         setLastName(profileData.last_name);
         setEmail(userData.email);
         setCity(profileData.location_city || '');
-        setEmotionalState(profileData.emotional_state || 'happy');
+        // If user had "stressed" selected, default to "anxious" 
+        const emotion = profileData.emotional_state === 'stressed' ? 'anxious' : profileData.emotional_state;
+        setEmotionalState(emotion || 'happy');
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -295,22 +296,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   emotionalOption: {
-    width: '30%',
+    width: '31%',
     backgroundColor: '#f2f2f2',
-    padding: 15,
+    paddingVertical: 18,
+    paddingHorizontal: 15,
     borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 10,
     borderWidth: 2,
     borderColor: '#d4dcc4',
+    minHeight: 90,
   },
   emotionalOptionSelected: {
     borderColor: '#40ae49',
     backgroundColor: '#88c78d',
   },
   emotionalIcon: {
-    fontSize: 24,
-    marginBottom: 5,
+    fontSize: 32,
+    marginBottom: 8,
+    lineHeight: 36,
+    includeFontPadding: false,
   },
   emotionalLabel: {
     fontSize: 12,

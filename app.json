@@ -23,7 +23,10 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "This app uses the camera to take profile pictures.",
         "NSPhotoLibraryUsageDescription": "This app accesses your photo library to choose profile pictures.",
-        "NSUserTrackingUsageDescription": "This app uses tracking to provide personalized experiences."
+        "NSUserTrackingUsageDescription": "This app uses tracking to provide personalized experiences.",
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {

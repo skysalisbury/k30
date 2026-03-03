@@ -262,7 +262,7 @@ export default function ProfileScreen() {
 
         Alert.alert(
           'Notifications Enabled! 🎉',
-          `You'll receive reminders every 2 minutes for testing. Check your notifications!`
+          'Daily kindness reminders scheduled for 9:00 AM and 9:00 PM. You\'ll receive your first reminder at the next scheduled time.'
         );
       } else {
         await cancelAllNotifications();
@@ -506,38 +506,14 @@ export default function ProfileScreen() {
                     Reminder Schedule
                   </ThemedText>
                   <ThemedText style={styles.darkText}>
-                    Every {notifications.frequency_hours} hours
+                    Daily reminders at:
                   </ThemedText>
                   <ThemedText style={styles.settingDetail}>
-                    {notifications.preferred_time_1} and {notifications.preferred_time_2}
+                    9:00 AM and 9:00 PM
                   </ThemedText>
-                  <TouchableOpacity
-                    style={styles.editTimesButton}
-                    onPress={() => setShowEditNotifications(true)}
-                  >
-                    <ThemedText style={styles.editTimesButtonText}>
-                      ✏️ Edit Times
-                    </ThemedText>
-                  </TouchableOpacity>
-                </ThemedView>
-
-                <ThemedView style={styles.settingCard}>
-                  <ThemedView style={styles.settingRow}>
-                    <ThemedView style={styles.settingInfo}>
-                      <ThemedText type="defaultSemiBold" style={styles.darkText}>
-                        Quiet Hours
-                      </ThemedText>
-                      <ThemedText style={styles.darkText}>
-                        {notifications.quiet_start} - {notifications.quiet_end}
-                      </ThemedText>
-                    </ThemedView>
-                    <Switch
-                      value={notifications?.quiet_hours_enabled || false}
-                      onValueChange={toggleQuietHours}
-                      trackColor={{ false: '#d4dcc4', true: '#40ae49' }}
-                      thumbColor={notifications?.quiet_hours_enabled ? '#ffffff' : '#f2f2f2'}
-                    />
-                  </ThemedView>
+                  <ThemedText style={[styles.darkText, { fontSize: 12, marginTop: 10, opacity: 0.7 }]}>
+                    Quiet hours: 10:00 PM - 8:00 AM
+                  </ThemedText>
                 </ThemedView>
 
                 <TouchableOpacity style={styles.testButton} onPress={handleTestNotification}>

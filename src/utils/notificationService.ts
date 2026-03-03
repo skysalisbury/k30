@@ -1,7 +1,6 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { getNotificationSettings } from './storage';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -9,8 +8,22 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
+
+// HARDCODED NOTIFICATION TIMES
+const MORNING_HOUR = 9;  // 9:00 AM
+const MORNING_MINUTE = 0;
+const EVENING_HOUR = 21; // 9:00 PM
+const EVENING_MINUTE = 0;
+
+// HARDCODED QUIET HOURS
+const QUIET_START_HOUR = 22;   // 10:00 PM
+const QUIET_START_MINUTE = 0;
+const QUIET_END_HOUR = 8;      // 8:00 AM
+const QUIET_END_MINUTE = 0;
 
 /**
  * Request notification permissions from the user
@@ -50,54 +63,50 @@ export async function registerForPushNotificationsAsync(): Promise<boolean> {
 }
 
 /**
- * Schedule daily kindness reminders based on user settings
+ * Schedule daily kindness reminders at hardcoded times
+ * Morning: 9:00 AM
+ * Evening: 9:00 PM
+ * Quiet Hours: 10:00 PM - 8:00 AM (notifications skipped if they fall in this window)
  */
 export async function scheduleDailyReminders(): Promise<void> {
   try {
     // Cancel all existing notifications first
     await Notifications.cancelAllScheduledNotificationsAsync();
-
-    // Get user's notification settings
-    const settings = await getNotificationSettings();
-
-    if (!settings || !settings.enabled) {
-      console.log('Notifications disabled by user');
-      return;
-    }
+    console.log('======================================');
+    console.log('SCHEDULING DAILY REMINDERS');
+    console.log('======================================');
+    console.log('Cancelled all existing notifications');
 
     const reminders = [
       {
-        time: settings.preferred_time_1, // e.g., "09:00"
+        hour: MORNING_HOUR,
+        minute: MORNING_MINUTE,
         title: '🌟 Morning Kindness Reminder',
         body: 'Start your day with an act of kindness! What will you do today?',
       },
       {
-        time: settings.preferred_time_2, // e.g., "21:00"
+        hour: EVENING_HOUR,
+        minute: EVENING_MINUTE,
         title: '💚 Evening Check-in',
         body: 'Did you spread kindness today? Log your act before the day ends!',
       },
     ];
 
-    for (const reminder of reminders) {
-      const [hours, minutes] = reminder.time.split(':').map(Number);
+    const now = new Date();
+    console.log('Current time:', now.toLocaleString());
+    console.log('Quiet hours: 10:00 PM - 8:00 AM');
+    console.log('--------------------------------------');
 
+    for (const reminder of reminders) {
       // Check if this time falls within quiet hours
-      if (settings.quiet_hours_enabled && isInQuietHours(hours, minutes, settings)) {
-        console.log(`Skipping reminder at ${reminder.time} - in quiet hours`);
+      if (isInQuietHours(reminder.hour, reminder.minute)) {
+        console.log('⏸️ SKIPPED:', reminder.title);
+        console.log('   Reason: Falls within quiet hours');
+        console.log('--------------------------------------');
         continue;
       }
 
-      // Calculate next occurrence of this time
-      const now = new Date();
-      const scheduledTime = new Date();
-      scheduledTime.setHours(hours, minutes, 0, 0);
-
-      // If the time has already passed today, schedule for tomorrow
-      if (scheduledTime <= now) {
-        scheduledTime.setDate(scheduledTime.getDate() + 1);
-        console.log(`Time ${reminder.time} already passed today, scheduling for tomorrow`);
-      }
-
+      // Use CalendarTrigger for exact daily repeats
       await Notifications.scheduleNotificationAsync({
         content: {
           title: reminder.title,
@@ -106,44 +115,56 @@ export async function scheduleDailyReminders(): Promise<void> {
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },
         trigger: {
-          hour: hours,
-          minute: minutes,
+          hour: reminder.hour,
+          minute: reminder.minute,
           repeats: true,
         } as Notifications.CalendarTriggerInput,
       });
 
-      console.log(`✅ Scheduled reminder at ${reminder.time} (${hours}:${minutes})`);
-      console.log(`   Current time: ${new Date().toLocaleString()}`);
-      console.log(`   Next trigger: ${scheduledTime.toLocaleString()}`);
+      const timeString = `${String(reminder.hour).padStart(2, '0')}:${String(reminder.minute).padStart(2, '0')}`;
+      console.log('✅ SCHEDULED:', reminder.title);
+      console.log('   Time:', timeString, '(daily)');
+      console.log('   Next fire: Next occurrence of', timeString);
+      console.log('--------------------------------------');
     }
 
-    console.log('All reminders scheduled successfully');
+    // Log all scheduled notifications for debugging
+    const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
+    console.log('======================================');
+    console.log('SUMMARY');
+    console.log('======================================');
+    console.log('Total scheduled notifications:', allScheduled.length);
+    allScheduled.forEach((notif, index) => {
+      console.log((index + 1) + '.', notif.content.title);
+      const trigger = notif.trigger as any;
+      if (trigger.hour !== undefined) {
+        console.log('   Fires daily at:', String(trigger.hour).padStart(2, '0') + ':' + String(trigger.minute).padStart(2, '0'));
+      }
+    });
+    console.log('======================================');
+
   } catch (error) {
-    console.error('Error scheduling reminders:', error);
+    console.error('❌ Error scheduling reminders:', error);
     throw error;
   }
 }
 
 /**
- * Check if a given time falls within quiet hours
+ * Check if a given time falls within hardcoded quiet hours (10 PM - 8 AM)
  */
-function isInQuietHours(
-  hour: number,
-  minute: number,
-  settings: { quiet_start: string; quiet_end: string }
-): boolean {
-  const [quietStartHour, quietStartMin] = settings.quiet_start.split(':').map(Number);
-  const [quietEndHour, quietEndMin] = settings.quiet_end.split(':').map(Number);
-
+function isInQuietHours(hour: number, minute: number): boolean {
   const currentTimeMinutes = hour * 60 + minute;
-  const quietStartMinutes = quietStartHour * 60 + quietStartMin;
-  const quietEndMinutes = quietEndHour * 60 + quietEndMin;
+  const quietStartMinutes = QUIET_START_HOUR * 60 + QUIET_START_MINUTE;
+  const quietEndMinutes = QUIET_END_HOUR * 60 + QUIET_END_MINUTE;
 
-  // Handle quiet hours that span midnight
+  // Handle quiet hours that span midnight (10 PM to 8 AM)
+  // quietStart (22:00 = 1320 min) > quietEnd (8:00 = 480 min)
   if (quietStartMinutes > quietEndMinutes) {
+    // Time is in quiet hours if it's >= 10 PM OR <= 8 AM
     return currentTimeMinutes >= quietStartMinutes || currentTimeMinutes <= quietEndMinutes;
   }
 
+  // Normal case (shouldn't happen with our hardcoded values, but included for completeness)
   return currentTimeMinutes >= quietStartMinutes && currentTimeMinutes <= quietEndMinutes;
 }
 
@@ -168,14 +189,14 @@ export async function sendTestNotification(): Promise<void> {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: '🎯 Test Notification',
-        body: 'Your kindness reminders are working! You\'ll receive daily reminders at your preferred times.',
+        body: 'Your kindness reminders are working! You will receive daily reminders at 9:00 AM and 9:00 PM.',
         sound: true,
       },
       trigger: {
         seconds: 2,
       } as Notifications.TimeIntervalTriggerInput,
     });
-    console.log('Test notification scheduled');
+    console.log('Test notification scheduled for 2 seconds from now');
   } catch (error) {
     console.error('Error sending test notification:', error);
     throw error;
@@ -188,7 +209,16 @@ export async function sendTestNotification(): Promise<void> {
 export async function getScheduledNotifications(): Promise<Notifications.NotificationRequest[]> {
   try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    console.log('Scheduled notifications:', scheduled.length);
+    console.log('======================================');
+    console.log('SCHEDULED NOTIFICATIONS');
+    console.log('======================================');
+    console.log('Total:', scheduled.length);
+    scheduled.forEach((notif, index) => {
+      console.log((index + 1) + '.', notif.content.title);
+      const trigger = notif.trigger as any;
+      console.log('   Trigger:', JSON.stringify(trigger));
+    });
+    console.log('======================================');
     return scheduled;
   } catch (error) {
     console.error('Error getting scheduled notifications:', error);

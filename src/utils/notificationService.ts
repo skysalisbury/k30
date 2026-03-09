@@ -63,10 +63,8 @@ export async function registerForPushNotificationsAsync(): Promise<boolean> {
 }
 
 /**
- * Schedule daily kindness reminders at hardcoded times
- * Morning: 9:00 AM
- * Evening: 9:00 PM
- * Quiet Hours: 10:00 PM - 8:00 AM (notifications skipped if they fall in this window)
+ * Schedule daily kindness reminders using DailyTriggerInput
+ * This is different from CalendarTriggerInput and may avoid the immediate fire bug
  */
 export async function scheduleDailyReminders(): Promise<void> {
   try {
@@ -74,6 +72,7 @@ export async function scheduleDailyReminders(): Promise<void> {
     await Notifications.cancelAllScheduledNotificationsAsync();
     console.log('======================================');
     console.log('SCHEDULING DAILY REMINDERS');
+    console.log('Using DailyTriggerInput (not CalendarTrigger)');
     console.log('======================================');
     console.log('Cancelled all existing notifications');
 
@@ -106,7 +105,8 @@ export async function scheduleDailyReminders(): Promise<void> {
         continue;
       }
 
-      // Use CalendarTrigger for exact daily repeats
+      // Use DailyTriggerInput instead of CalendarTriggerInput
+      // This might avoid the immediate fire bug
       await Notifications.scheduleNotificationAsync({
         content: {
           title: reminder.title,
@@ -118,12 +118,14 @@ export async function scheduleDailyReminders(): Promise<void> {
           hour: reminder.hour,
           minute: reminder.minute,
           repeats: true,
-        } as Notifications.CalendarTriggerInput,
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        } as Notifications.DailyTriggerInput,
       });
 
       const timeString = `${String(reminder.hour).padStart(2, '0')}:${String(reminder.minute).padStart(2, '0')}`;
       console.log('✅ SCHEDULED:', reminder.title);
       console.log('   Time:', timeString, '(daily)');
+      console.log('   Trigger type: DailyTriggerInput');
       console.log('   Next fire: Next occurrence of', timeString);
       console.log('--------------------------------------');
     }
@@ -137,6 +139,7 @@ export async function scheduleDailyReminders(): Promise<void> {
     allScheduled.forEach((notif, index) => {
       console.log((index + 1) + '.', notif.content.title);
       const trigger = notif.trigger as any;
+      console.log('   Type:', trigger.type || 'unknown');
       if (trigger.hour !== undefined) {
         console.log('   Fires daily at:', String(trigger.hour).padStart(2, '0') + ':' + String(trigger.minute).padStart(2, '0'));
       }
@@ -158,13 +161,10 @@ function isInQuietHours(hour: number, minute: number): boolean {
   const quietEndMinutes = QUIET_END_HOUR * 60 + QUIET_END_MINUTE;
 
   // Handle quiet hours that span midnight (10 PM to 8 AM)
-  // quietStart (22:00 = 1320 min) > quietEnd (8:00 = 480 min)
   if (quietStartMinutes > quietEndMinutes) {
-    // Time is in quiet hours if it's >= 10 PM OR <= 8 AM
     return currentTimeMinutes >= quietStartMinutes || currentTimeMinutes <= quietEndMinutes;
   }
 
-  // Normal case (shouldn't happen with our hardcoded values, but included for completeness)
   return currentTimeMinutes >= quietStartMinutes && currentTimeMinutes <= quietEndMinutes;
 }
 

@@ -92,7 +92,6 @@ export default function ProfileScreen() {
         }
       );
     } else {
-      // Android
       Alert.alert(
         'Change Profile Picture',
         'Choose an option',
@@ -107,7 +106,6 @@ export default function ProfileScreen() {
 
   const pickImage = async (useCamera: boolean) => {
     try {
-      // Request permissions
       const permissionResult = useCamera
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -120,7 +118,6 @@ export default function ProfileScreen() {
         return;
       }
 
-      // Launch picker
       const result = useCamera
         ? await ImagePicker.launchCameraAsync({
           allowsEditing: true,
@@ -137,7 +134,6 @@ export default function ProfileScreen() {
       if (!result.canceled && result.assets[0] && profile) {
         const imageUri = result.assets[0].uri;
 
-        // Update profile with new avatar
         const updatedProfile = {
           ...profile,
           avatar_uri: imageUri,
@@ -159,7 +155,6 @@ export default function ProfileScreen() {
     try {
       const message = 'Join me in Kind30! Download: https://kind30.app';
 
-      // Use native Share API (works on both iOS and Android)
       const result = await Share.share({
         message: message,
         title: 'Join Kind30',
@@ -262,7 +257,7 @@ export default function ProfileScreen() {
 
         Alert.alert(
           'Notifications Enabled! 🎉',
-          'Daily kindness reminders scheduled for 9:00 AM and 9:00 PM. You\'ll receive your first reminder at the next scheduled time.'
+          `Daily kindness reminders scheduled for ${updatedSettings.preferred_time_1} and ${updatedSettings.preferred_time_2}. You'll receive confirmation notifications immediately.`
         );
       } else {
         await cancelAllNotifications();
@@ -332,15 +327,12 @@ export default function ProfileScreen() {
     try {
       console.log('🗑️ Starting profile deletion...');
 
-      // Clear all data
       await clearAllData();
       console.log('✅ clearAllData() completed');
 
-      // Extra safeguard: manually clear kindness acts
       await AsyncStorage.setItem('kindness_acts', JSON.stringify([]));
       console.log('✅ Manually cleared kindness_acts');
 
-      // Clear state
       setUser(null);
       setProfile(null);
       setStreak(null);
@@ -348,7 +340,6 @@ export default function ProfileScreen() {
 
       console.log('✅ Profile deleted, navigating to welcome...');
 
-      // Immediately navigate to welcome screen
       router.replace('/welcome');
     } catch (error) {
       console.error('Error clearing data:', error);
@@ -420,7 +411,6 @@ export default function ProfileScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* User Name with Sun Logos */}
             <View style={styles.nameWithLogos}>
               <Image
                 source={require('@/assets/images/C91E96D5-6719-4F09-8523-2BAB1D53B09FKind_Sun.jpeg')}
@@ -509,11 +499,38 @@ export default function ProfileScreen() {
                     Daily reminders at:
                   </ThemedText>
                   <ThemedText style={styles.settingDetail}>
-                    9:00 AM and 9:00 PM
+                    {notifications.preferred_time_1} and {notifications.preferred_time_2}
                   </ThemedText>
-                  <ThemedText style={[styles.darkText, { fontSize: 12, marginTop: 10, opacity: 0.7 }]}>
-                    Quiet hours: 10:00 PM - 8:00 AM
+                  <TouchableOpacity
+                    style={styles.editTimesButton}
+                    onPress={() => setShowEditNotifications(true)}
+                  >
+                    <ThemedText style={styles.editTimesButtonText}>
+                      ✏️ Edit Times
+                    </ThemedText>
+                  </TouchableOpacity>
+                  <ThemedText style={[styles.darkText, { fontSize: 11, marginTop: 12, opacity: 0.6, fontStyle: 'italic' }]}>
+                    Note: You'll receive confirmation notifications immediately when changing times.
                   </ThemedText>
+                </ThemedView>
+
+                <ThemedView style={styles.settingCard}>
+                  <ThemedView style={styles.settingRow}>
+                    <ThemedView style={styles.settingInfo}>
+                      <ThemedText type="defaultSemiBold" style={styles.darkText}>
+                        Quiet Hours
+                      </ThemedText>
+                      <ThemedText style={styles.darkText}>
+                        {notifications.quiet_start} - {notifications.quiet_end}
+                      </ThemedText>
+                    </ThemedView>
+                    <Switch
+                      value={notifications?.quiet_hours_enabled || false}
+                      onValueChange={toggleQuietHours}
+                      trackColor={{ false: '#d4dcc4', true: '#40ae49' }}
+                      thumbColor={notifications?.quiet_hours_enabled ? '#ffffff' : '#f2f2f2'}
+                    />
+                  </ThemedView>
                 </ThemedView>
 
                 <TouchableOpacity style={styles.testButton} onPress={handleTestNotification}>
@@ -608,7 +625,6 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#ffffff',
   },
-
   profileHeader: {
     alignItems: 'center',
     marginBottom: spacing.xl,
@@ -635,20 +651,6 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: typography.weights.bold,
     color: '#000000',
-  },
-  cameraIconContainer: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#40ae49',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cameraIcon: {
-    fontSize: 14,
   },
   editIconContainer: {
     position: 'absolute',
@@ -694,7 +696,6 @@ const styles = StyleSheet.create({
   darkText: {
     color: '#000000',
   },
-
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -721,7 +722,6 @@ const styles = StyleSheet.create({
   statLabel: {
     color: '#000000',
   },
-
   settingsSection: {
     marginBottom: spacing.xl,
     backgroundColor: 'transparent',
@@ -780,7 +780,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: typography.sizes.md,
   },
-
   wellbeingSection: {
     marginBottom: spacing.xl,
     backgroundColor: 'transparent',
@@ -804,7 +803,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     fontWeight: typography.weights.semibold,
   },
-
   recalculateButton: {
     backgroundColor: '#88c78d',
     padding: spacing.md,

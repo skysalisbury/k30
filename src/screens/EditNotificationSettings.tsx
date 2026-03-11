@@ -49,7 +49,7 @@ export default function EditNotificationSettings({ currentSettings, onComplete }
 
       Alert.alert(
         'Settings Updated! ✅',
-        'Your notification schedule has been updated. You may receive a test notification shortly as the schedule is reset. Daily reminders will arrive at your chosen times starting tomorrow.',
+        'Your notification times have been saved. You will receive confirmation notifications immediately, then daily reminders at your chosen times.',
         [{ text: 'OK', onPress: onComplete }]
       );
     } catch (error) {
